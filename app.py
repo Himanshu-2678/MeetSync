@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request
 import os
+from summarizer import summarize_text
+from transcribe import transcribe_audio
 
 ## defining the app
 app = Flask(__name__)
@@ -17,7 +19,10 @@ def upload():
     file_path = os.path.join(upload_folder, audio_file.filename)
     audio_file.save(file_path)
 
-    return f"File {audio_file.filename} uploaded successfully!"
+    transcript = transcribe_audio(file_path)
+    summary = summarize_text(transcript)
+
+    return summary
 
 ## Driver Code
 if __name__ == "__main__":
