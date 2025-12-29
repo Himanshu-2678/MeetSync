@@ -9,20 +9,20 @@ app = Flask(__name__)
 upload_folder = 'uploads'
 os.makedirs(upload_folder, exist_ok=True)
 
-@app.route("/")
+@app.route("/", methods = ["GET", "POST"])
 def home():
-    return render_template('index.html')
+    transcript = None
+    summary = None
 
-@app.route('/upload', methods=['POST'])
-def upload():
-    audio_file = request.files['audio']
-    file_path = os.path.join(upload_folder, audio_file.filename)
-    audio_file.save(file_path)
+    if request.method == "POST":
+        audio_file = request.files['audio']
+        file_path = os.path.join(upload_folder, audio_file.filename)
+        audio_file.save(file_path)
 
-    transcript = transcribe_audio(file_path)
-    summary = summarize_text(transcript)
+        transcript = transcribe_audio(file_path)
+        summary = summarize_text(transcript)
 
-    return summary
+    return render_template('index.html', transcript=transcript, summary=summary)
 
 ## Driver Code
 if __name__ == "__main__":

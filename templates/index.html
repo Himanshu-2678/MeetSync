@@ -2,15 +2,51 @@
 <html>
 <head>
     <title>MeetSync</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        .box {
+            margin-top: 30px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+        h2 {
+            margin-top: 0;
+        }
+    </style>
 </head>
 <body>
-    <h1>MeetSync</h1>
-    <p>Upload meeting audio</p>
+    <div class="container">
+        <h1>MeetSync</h1>
+        <p>Upload a meeting audio file</p>
 
-    <form action="/upload" method="POST" enctype="multipart/form-data">
-        <input type="file" name="audio" required>
-        <br><br>
-        <button type="submit">Upload</button>
-    </form>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="audio" required>
+            <br><br>
+            <button type="submit">Upload</button>
+        </form>
+
+        {% if summary %}
+        <div class="box">
+            <h2>Summary</h2>
+            <pre>{{ summary }}</pre>
+        </div>
+        {% endif %}
+
+        {% if transcript %}
+        <div class="box">
+            <h2>Transcript</h2>
+            <pre>{{ transcript }}</pre>
+        </div>
+        {% endif %}
+    </div>
 </body>
 </html>
