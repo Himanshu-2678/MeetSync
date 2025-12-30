@@ -10,6 +10,8 @@ def transcribe_audio(file_path: str) -> str:
 import os
 import requests
 
+import logging
+
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
 def transcribe_audio(file_path: str) -> str:
@@ -27,5 +29,6 @@ def transcribe_audio(file_path: str) -> str:
 
     result = response.json()
     transcript = result.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("transcript", "")
+    logging.warning(f"DEEPGRAM STATUS: {response.status_code} {response.text}")
 
     return transcript
