@@ -1,4 +1,5 @@
 flask>=2.3,<3.0
+gunicorn    
 openai-whisper
 torch
 python-dotenv
