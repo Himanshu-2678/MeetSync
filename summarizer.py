@@ -1,24 +1,32 @@
-from transformers import pipeline
+import os
+from google import genai
 
-## loading the summarization pipeline
-summarizer = pipeline("text2text-generation", model="google/flan-t5-base")
-
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def summarize_text(text: str) -> str:
-
-    if len(text.split()) < 30:
+    if not text or len(text.split()) < 30:
         return "The audio is too short to generate a meaningful summary."
 
-    prompt = (
-        "Explain the main idea of the following meeting or speech in a concise way. "
-        "Mention what it is about and the conclusion if present:\n\n"
-        f"{text}"
-    )
+    prompt = f"""
+    You are an AI assistant generating professional meeting minutes.
 
-    result = summarizer(
-        prompt,
-        max_length=150,
-        do_sample=False
-    )
+    Rules:
+    - Output ONLY bullet points
+    - Do NOT add headings, introductions, or explanations
+    - If no decisions or action items are present, explicitly say "None"
 
-    return result[0]["generated_text"]
+    Generate concise bullet points covering:
+    - Main topics discussed
+    - Key decisions
+    - Conclusions
+    - Action items (if any)
+
+    Transcript:
+    {text}
+    """
+    
+    response = client.models.generate_content(
+        model="models/gemini-2.5-flash", 
+        contents=prompt)
+
+    return response.text.strip()

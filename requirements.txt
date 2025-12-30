@@ -1,1 +1,7 @@
-flask
+flask>=2.3,<3.0
+openai-whisper
+torch
+transformers
+sentencepiece
+ffmpeg-python
+google-genai
