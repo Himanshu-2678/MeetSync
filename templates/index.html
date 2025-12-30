@@ -5,11 +5,22 @@
     <title>MeetSync</title>
 
     <style>
+        .header {
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .header .description {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        
         body {
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background-color: #EDEAE0;
+            background-color: #ececec;
             color: #1f2937;
         }
 
@@ -104,10 +115,14 @@
 
 <body>
     <div class="container">
-        <h1>MeetSync</h1>
-        <p class="description">
-            Upload a meeting audio file and get a clear, concise summary using AI.
-        </p>
+
+        <!-- Header -->
+        <div class="header">
+            <h1>MeetSync</h1>
+            <p class="description">
+                Turn meeting audio into clear, actionable summaries using AI.
+            </p>
+        </div>
 
         <!-- Upload Section -->
         <div class="upload-card">
@@ -143,6 +158,7 @@
                 </p>
             {% endif %}
         </div>
+
     </div>
 
     <script>
@@ -151,4 +167,5 @@
         }
     </script>
 </body>
+
 </html>
