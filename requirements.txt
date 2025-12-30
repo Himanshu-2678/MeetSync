@@ -1,9 +1,10 @@
 flask>=2.3,<3.0
 gunicorn    
-openai-whisper
-torch
+#openai-whisper
+#torch
 python-dotenv
 transformers
 sentencepiece
-ffmpeg-python
+#ffmpeg-python
 google-genai
+requests
