@@ -42,7 +42,12 @@ I created MeetSync to automate this process and turn raw meeting audio into acti
 - Speech-to-Text: Whisper  
 - LLM: Google Gemini API  
 - Frontend: HTML, CSS  
-- Session Management: Flask sessions  
+- Session Management: Flask sessions
+
+## Screenshot/Demo
+- Video Demo Link: yet to add
+
+<img width="1552" height="921" alt="Screenshot 2025-12-30 135936" src="https://github.com/user-attachments/assets/e2dc69ea-4cf1-4c34-aeff-0f811293d51d" />
 
 ## Project Structure
 ```
