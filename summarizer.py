@@ -4,7 +4,7 @@ from google import genai
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def summarize_text(text: str) -> str:
-    if not text or len(text.split()) < 30:
+    if not text or len(text.split()) < 5:
         return "The audio is too short to generate a meaningful summary."
 
     prompt = f"""
