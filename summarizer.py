@@ -8,22 +8,22 @@ def summarize_text(text: str) -> str:
         return "The audio is too short to generate a meaningful summary."
 
     prompt = f"""
-    You are an AI assistant generating professional meeting minutes.
+    You are generating professional meeting minutes.
+
+    Output format (strict):
+    OVERALL AUDIO/MEETING FILE SUMMARY :
+    - bullet points
+    - Keep every details without missing any information
+    ACTION ITEMS:
+    - bullet points with owner if mentioned like this -> Owner name only: Task 
+    - if no action items, write "None"
 
     Rules:
-    - Output ONLY bullet points
-    - Do NOT add headings, introductions, or explanations
-    - If no decisions or action items are present, explicitly say "None"
-
-    Generate concise bullet points covering:
-    - Main topics discussed
-    - Key decisions
-    - Conclusions
-    - Action items (if any)
+    - Use '-' for bullet points
+    - Do not add extra text or explanations
 
     Transcript:
-    {text}
-    """
+    {text}"""
     
     response = client.models.generate_content(
         model="models/gemini-2.5-flash", 
