@@ -1,8 +1,8 @@
 flask>=2.3,<3.0
 openai-whisper
 torch
+python-dotenv
 transformers
 sentencepiece
 ffmpeg-python
 google-genai
-gunicorn
