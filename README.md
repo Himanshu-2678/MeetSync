@@ -39,7 +39,7 @@ I created MeetSync to automate this process and turn raw meeting audio into acti
 ## Tech Stack
 
 - Backend: Python, Flask  
-- Speech-to-Text: Whisper  
+- Speech-to-Text: Deepgram API 
 - LLM: Google Gemini API  
 - Frontend: HTML, CSS  
 - Session Management: Flask sessions
