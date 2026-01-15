@@ -3,6 +3,8 @@
 MeetSync is an AI-powered meeting minutes generator I built to help users quickly extract key insights from meeting audio.
 The idea was simple: instead of listening to long recordings or writing notes manually, users should be able to upload meeting audio and instantly get clear, structured minutes with decisions and action items.
 
+## Architecture Diagram
+![MeetSync Architecture](assets/architecture.png)
 
 ## Why I built this
 
