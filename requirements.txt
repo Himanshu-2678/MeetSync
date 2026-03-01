@@ -8,3 +8,9 @@ sentencepiece
 #ffmpeg-python
 google-genai
 requests
+sqlalchemy
+psycopg2-binary
+dateparser
+celery
+redis
+apscheduler
