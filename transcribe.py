@@ -1,12 +1,3 @@
-"""import whisper
-
-model = whisper.load_model("base")
-
-## function for transcribing audio
-def transcribe_audio(file_path: str) -> str:
-    ans = model.transcribe(file_path)
-    return ans["text"]"""
-
 import os
 import requests
 
@@ -24,8 +15,7 @@ def transcribe_audio(file_path: str) -> str:
             "Authorization": f"Token {DEEPGRAM_API_KEY}",
             "Content-Type": "application/octet-stream",
         },
-        data=audio_bytes
-    )
+        data=audio_bytes)
 
     result = response.json()
     transcript = result.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("transcript", "")
