@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MeetSync — {{ meeting.filename }}</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #ececec;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 40px 20px;
+        }
+
+        .header { text-align: center; margin-bottom: 40px; }
+        h1 { font-size: 2.2rem; margin-bottom: 6px; }
+        .meta { font-size: 0.88rem; color: #6b7280; }
+
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 24px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+        }
+
+        h3 { margin-top: 0; font-size: 1.1rem; }
+
+        .summary-text { line-height: 1.7; font-size: 0.97rem; }
+
+        .task-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px 18px;
+            margin-bottom: 14px;
+        }
+
+        .task-card.priority-high   { border-left: 4px solid #ef4444; }
+        .task-card.priority-medium { border-left: 4px solid #f59e0b; }
+        .task-card.priority-low    { border-left: 4px solid #10b981; }
+
+        .task-title {
+            font-weight: 600;
+            font-size: 0.97rem;
+            margin-bottom: 10px;
+            color: #111827;
+        }
+
+        .task-meta { display: flex; flex-wrap: wrap; gap: 10px; }
+
+        .meta-item {
+            font-size: 0.85rem;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 4px 10px;
+            color: #374151;
+        }
+
+        .meta-item span { font-weight: 600; color: #4C516D; }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .badge-high   { background: #fee2e2; color: #dc2626; }
+        .badge-medium { background: #fef3c7; color: #d97706; }
+        .badge-low    { background: #d1fae5; color: #059669; }
+
+        .no-tasks { color: #6b7280; font-style: italic; font-size: 0.9rem; }
+
+        .divider { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+
+        .actions { display: flex; gap: 12px; margin-top: 10px; }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 14px;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-dark    { background: #1f2937; }
+        .btn-primary { background: #4C516D; }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <div class="header">
+            <h1>MeetSync</h1>
+            <p class="meta">{{ meeting.filename }} &nbsp;·&nbsp; {{ meeting.created_at.strftime('%d %b %Y, %H:%M') }}</p>
+        </div>
+
+        <!-- Summary -->
+        <div class="card">
+            <h3>Meeting Summary</h3>
+            <p class="summary-text">{{ meeting.summary }}</p>
+
+            <hr class="divider">
+
+            <!-- Tasks -->
+            <h3>Action Items & Tasks</h3>
+            {% if tasks %}
+                {% for t in tasks %}
+                    {% set priority = t.priority | lower %}
+                    <div class="task-card priority-{{ priority }}">
+                        <div class="task-title">
+                            {{ loop.index }}. {{ t.description }}
+                            <span class="badge badge-{{ priority }}">{{ t.priority }}</span>
+                        </div>
+                        <div class="task-meta">
+                            <div class="meta-item"><span>Owner</span> &nbsp;{{ t.owner }}</div>
+                            <div class="meta-item"><span>Deadline</span> &nbsp;{{ t.deadline_raw or "Not specified" }}</div>
+                            <div class="meta-item"><span>Status</span> &nbsp;{{ t.status }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="no-tasks">No action items were identified in this meeting.</p>
+            {% endif %}
+
+            <div class="actions">
+                <a href="/download/{{ meeting.id }}" class="btn btn-dark">⬇ Download Summary</a>
+                <a href="/" class="btn btn-primary">Upload Another</a>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
