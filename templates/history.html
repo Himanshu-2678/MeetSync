@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MeetSync — Meeting History</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #ececec;
+            color: #1f2937;
+        }
+
+        .container { max-width: 900px; margin: auto; padding: 40px 20px; }
+
+        .header { text-align: center; margin-bottom: 40px; }
+        h1 { font-size: 2.2rem; margin-bottom: 6px; }
+        .subtitle { color: #6b7280; font-size: 0.95rem; }
+
+        .nav { text-align: center; margin-bottom: 30px; }
+        .nav a {
+            margin: 0 10px;
+            color: #4C516D;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .nav a:hover { text-decoration: underline; }
+
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 24px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.05);
+            margin-bottom: 16px;
+        }
+
+        .meeting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .meeting-info { flex: 1; }
+        .meeting-filename { font-weight: 600; font-size: 0.97rem; margin-bottom: 4px; }
+        .meeting-meta { font-size: 0.83rem; color: #6b7280; }
+
+        .meeting-right { display: flex; align-items: center; gap: 12px; }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+
+        .badge-success  { background: #d1fae5; color: #059669; }
+        .badge-failed   { background: #fee2e2; color: #dc2626; }
+        .badge-processing { background: #fef3c7; color: #d97706; }
+
+        .btn {
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 0.83rem;
+            text-decoration: none;
+            color: white;
+            background: #4C516D;
+        }
+
+        .btn:hover { opacity: 0.9; }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .page-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: 1px solid #e5e7eb;
+            background: #ffffff;
+            cursor: pointer;
+            color: #1f2937;
+        }
+
+        .page-btn:hover { background: #f3f4f6; }
+        .page-btn.active { background: #4C516D; color: white; border-color: #4C516D; }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .empty { color: #6b7280; font-style: italic; text-align: center; padding: 40px 0; }
+        .loading { text-align: center; padding: 40px 0; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MeetSync</h1>
+            <p class="subtitle">Meeting History</p>
+        </div>
+
+        <div class="nav">
+            <a href="/">← Upload New</a>
+            <a href="/tasks/search">🔍 Search Tasks</a>
+        </div>
+
+        <div id="meetings-list">
+            <div class="loading">Loading meetings...</div>
+        </div>
+
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+
+        async function loadMeetings(page) {
+            currentPage = page;
+            const res = await fetch(`/api/meetings?page=${page}`);
+            const data = await res.json();
+
+            const list = document.getElementById("meetings-list");
+            const pagination = document.getElementById("pagination");
+
+            if (data.meetings.length === 0) {
+                list.innerHTML = '<p class="empty">No meetings found.</p>';
+                pagination.innerHTML = '';
+                return;
+            }
+
+            list.innerHTML = data.meetings.map(m => `
+                <div class="card">
+                    <div class="meeting-row">
+                        <div class="meeting-info">
+                            <div class="meeting-filename">${m.filename}</div>
+                            <div class="meeting-meta">
+                                ${m.created_at}
+                                ${m.processing_time_seconds ? ` · ${m.processing_time_seconds}s` : ''}
+                            </div>
+                        </div>
+                        <div class="meeting-right">
+                            <span class="badge badge-${m.processing_status}">${m.processing_status}</span>
+                            ${m.processing_status === 'success'
+                                ? `<a href="/result/${m.id}" class="btn">View</a>`
+                                : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Pagination
+            pagination.innerHTML = '';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = '← Prev';
+            prevBtn.className = 'page-btn';
+            prevBtn.disabled = page === 1;
+            prevBtn.onclick = () => loadMeetings(page - 1);
+            pagination.appendChild(prevBtn);
+
+            for (let i = 1; i <= data.total_pages; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = `page-btn ${i === page ? 'active' : ''}`;
+                btn.onclick = () => loadMeetings(i);
+                pagination.appendChild(btn);
+            }
+
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = 'Next →';
+            nextBtn.className = 'page-btn';
+            nextBtn.disabled = page === data.total_pages;
+            nextBtn.onclick = () => loadMeetings(page + 1);
+            pagination.appendChild(nextBtn);
+        }
+
+        loadMeetings(1);
+    </script>
+</body>
+</html>
