@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Date, TIMESTAMP, ForeignKey, func, Index
+from sqlalchemy import Column, Integer, String, Text, Date, TIMESTAMP, ForeignKey, func, Index, Float
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -15,7 +15,7 @@ class Meeting(Base):
     created_at        = Column(TIMESTAMP, server_default=func.now())
 
     tasks = relationship("Task", back_populates="meeting", cascade="all, delete-orphan")
-
+    metrics = relationship("MeetingMetrics", back_populates="meeting", uselist=False, cascade="all, delete-orphan")
     __table_args__ = (
         Index("ix_meetings_processing_status", "processing_status"),
     )
@@ -39,3 +39,18 @@ class Task(Base):
     __table_args__ = (
         UniqueConstraint("meeting_id", "description", name="uq_task_meeting_description"),
     )
+
+
+class MeetingMetrics(Base):
+    __tablename__ = "meeting_metrics"
+
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    meeting_id               = Column(Integer, ForeignKey("meetings.id"), nullable=False, unique=True)
+    processing_time_seconds  = Column(Float, nullable=True)
+    transcript_word_count    = Column(Integer, nullable=True)
+    gemini_retry_count       = Column(Integer, nullable=False, default=0)
+    status                   = Column(String(20), nullable=False)
+    failure_reason           = Column(Text, nullable=True)
+    created_at               = Column(TIMESTAMP, server_default=func.now())
+
+    meeting = relationship("Meeting", back_populates="metrics")
