@@ -3,6 +3,8 @@ import io
 from dotenv import load_dotenv
 load_dotenv()
 
+from database.init_db import init_db
+
 from sqlalchemy import func as sa_func
 from datetime import date
 
@@ -20,6 +22,9 @@ import atexit
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
+with app.app_context():
+    init_db()
+    
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s")
