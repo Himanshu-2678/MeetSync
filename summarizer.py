@@ -5,14 +5,12 @@ from google import genai
 from pydantic import BaseModel, field_validator, ValidationError
 from typing import List
 
-# ── Structured Logger ──────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
+    format="%(asctime)s | %(levelname)s | %(message)s")
+
 logger = logging.getLogger(__name__)
 
-# ── Pydantic Schema ────────────────────────────────────────────────────────────
 class Task(BaseModel):
     task: str
     owner: str
@@ -24,7 +22,6 @@ class Task(BaseModel):
     @classmethod
     def validate_priority(cls, v):
         allowed = {"High", "Medium", "Low"}
-        # Normalize casing before rejecting
         normalized = v.strip().capitalize()
         if normalized not in allowed:
             raise ValueError(f"priority must be one of {allowed}, got '{v}'")
@@ -50,9 +47,7 @@ class MeetingOutput(BaseModel):
         return v.strip()
 
 
-# ── Gemini Client ──────────────────────────────────────────────────────────────
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
 MAX_ATTEMPTS = 2
 
 PROMPT_TEMPLATE = """
@@ -84,7 +79,7 @@ Transcript:
 {transcript}
 """
 
-# ── Main Function ──────────────────────────────────────────────────────────────
+
 def summarize_text(text: str) -> dict:
     if not text or len(text.split()) < 5:
         logger.warning("Input too short to summarize.")
@@ -92,11 +87,12 @@ def summarize_text(text: str) -> dict:
             "status": "failed",
             "error": "Input transcript is too short.",
             "summary": None,
-            "tasks": []
-        }
+            "tasks": [],
+            "retry_count": 0}
 
     prompt = PROMPT_TEMPLATE.format(transcript=text)
     last_error = None
+    attempt = 0
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         logger.info(f"Attempt {attempt}/{MAX_ATTEMPTS} — Calling Gemini API")
@@ -104,11 +100,10 @@ def summarize_text(text: str) -> dict:
         try:
             response = client.models.generate_content(
                 model="models/gemini-2.5-flash",
-                contents=prompt
-            )
+                contents=prompt)
+            
             raw = response.text.strip()
 
-            # Strip markdown fences if present
             if raw.startswith("```"):
                 parts = raw.split("```")
                 raw = parts[1] if len(parts) > 1 else raw
@@ -118,7 +113,6 @@ def summarize_text(text: str) -> dict:
 
             logger.info(f"Attempt {attempt} — Raw output received ({len(raw)} chars)")
 
-            # Step 1: Parse JSON
             try:
                 parsed = json.loads(raw)
             except json.JSONDecodeError as e:
@@ -127,11 +121,10 @@ def summarize_text(text: str) -> dict:
                     "attempt": attempt,
                     "failure_reason": "JSON parse failed",
                     "error": str(e),
-                    "raw_output": raw[:300]  # truncate for log readability
-                }))
-                continue  # retry
+                    "raw_output": raw[:300]}))
+                
+                continue
 
-            # Step 2: Validate against Pydantic schema
             try:
                 validated = MeetingOutput(**parsed)
             except ValidationError as e:
@@ -143,40 +136,35 @@ def summarize_text(text: str) -> dict:
                     "validation_errors": errors,
                     "raw_output": raw[:300]
                 }, default=str))
-                continue  # retry
+                continue
 
-            # Success
             logger.info(json.dumps({
                 "attempt": attempt,
                 "status": "success",
-                "task_count": len(validated.tasks)
-            }))
+                "task_count": len(validated.tasks)}))
 
             return {
                 "status": "success",
                 "summary": validated.summary,
-                "tasks": [t.model_dump() for t in validated.tasks]
-            }
+                "tasks": [t.model_dump() for t in validated.tasks],
+                "retry_count": attempt - 1}
 
         except Exception as e:
             last_error = f"Unexpected error: {str(e)}"
             logger.error(json.dumps({
                 "attempt": attempt,
                 "failure_reason": "Unexpected exception",
-                "error": str(e)
-            }))
+                "error": str(e)}))
             continue
 
-    # All retries exhausted
     logger.error(json.dumps({
         "status": "failed",
         "error": "All attempts exhausted",
-        "last_error": last_error
-    }))
+        "last_error": last_error}))
 
     return {
         "status": "failed",
         "error": f"Schema validation failed after {MAX_ATTEMPTS} attempts. Last error: {last_error}",
         "summary": None,
-        "tasks": []
-    }
+        "tasks": [],
+        "retry_count": attempt - 1}
