@@ -1,7 +1,10 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, session
 import io
 from dotenv import load_dotenv
 load_dotenv()
+
+from sqlalchemy import func as sa_func
+from datetime import date
 
 from utils.stale_job_detector import mark_stale_meetings
 import os
@@ -19,8 +22,8 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
+    format="%(asctime)s | %(levelname)s | %(message)s")
+
 logger = logging.getLogger(__name__)
 
 upload_folder = 'uploads'
@@ -37,8 +40,7 @@ scheduler.add_job(
     trigger="interval",
     minutes=10,
     id="stale_job_detector",
-    replace_existing=True
-)
+    replace_existing=True)
 scheduler.start()
 
 # Run once immediately on startup too
@@ -83,6 +85,111 @@ def download_summary(meeting_id):
         db.close()
 
 
+# API: Meeting history 
+@app.route("/api/meetings")
+def api_meetings():
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+
+    db = SessionLocal()
+    try:
+        total = db.query(Meeting).count()
+        meetings = (
+            db.query(Meeting)
+            .order_by(Meeting.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+        return jsonify({
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": -(-total // per_page),  # ceiling division
+            "meetings": [
+                {
+                    "id": m.id,
+                    "filename": m.filename,
+                    "processing_status": m.processing_status,
+                    "created_at": m.created_at.strftime("%d %b %Y, %H:%M"),
+                    "processing_time_seconds": (
+                        round(m.metrics.processing_time_seconds, 2)
+                        if m.metrics and m.metrics.processing_time_seconds else None
+                    )
+                }
+                for m in meetings
+            ]
+        })
+    finally:
+        db.close()
+
+
+# Tasks with filters
+@app.route("/api/tasks")
+def api_tasks():
+    priority = request.args.get("priority")        # High / Medium / Low
+    status   = request.args.get("status")          # pending / completed
+    overdue  = request.args.get("overdue")         # true / false
+
+    db = SessionLocal()
+    try:
+        query = db.query(Task).join(Meeting)
+
+        if priority:
+            query = query.filter(Task.priority == priority)
+
+        if status:
+            query = query.filter(Task.status == status)
+
+        if overdue and overdue.lower() == "true":
+            today = date.today()
+            query = query.filter(
+                Task.deadline_parsed < today,
+                Task.deadline_parsed.isnot(None),
+                Task.status != "completed"
+            )
+
+        tasks = query.order_by(Task.created_at.desc()).all()
+
+        return jsonify({
+            "count": len(tasks),
+            "filters": {
+                "priority": priority,
+                "status": status,
+                "overdue": overdue
+            },
+            "tasks": [
+                {
+                    "id": t.id,
+                    "meeting_id": t.meeting_id,
+                    "meeting_filename": t.meeting.filename,
+                    "description": t.description,
+                    "owner": t.owner,
+                    "deadline_raw": t.deadline_raw,
+                    "deadline_parsed": t.deadline_parsed.strftime("%d %b %Y") if t.deadline_parsed else None,
+                    "priority": t.priority,
+                    "status": t.status
+                }
+                for t in tasks
+            ]
+        })
+    finally:
+        db.close()
+
+
+# Meeting history page
+@app.route("/history")
+def history():
+    return render_template("history.html")
+
+
+# Task searching
+@app.route("/tasks/search")
+def task_search():
+    return render_template("task_search.html")
+
+
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
@@ -106,10 +213,9 @@ def home():
         try:
             process_meeting.delay(meeting_id, file_path)
             logger.info(f"Meeting {meeting_id} enqueued successfully")
+            session['last_meeting_id'] = meeting_id  # ← store in session
         except Exception as e:
             logger.error(f"Failed to enqueue meeting {meeting_id}: {e}")
-
-            # Mark meeting as failed immediately
             db = SessionLocal()
             try:
                 meeting = db.query(Meeting).filter_by(id=meeting_id).first()
@@ -121,10 +227,19 @@ def home():
                 db.rollback()
             finally:
                 db.close()
-
             return render_template("index.html", error="Service temporarily unavailable. Please try again.")
 
         return redirect(url_for("meeting_status", meeting_id=meeting_id))
+
+    last_meeting_id = session.get('last_meeting_id')
+    if last_meeting_id:
+        db = SessionLocal()
+        try:
+            meeting = db.query(Meeting).filter_by(id=last_meeting_id).first()
+            if meeting and meeting.processing_status == "success":
+                return redirect(url_for("meeting_result", meeting_id=last_meeting_id))
+        finally:
+            db.close()
 
     return render_template("index.html", error=None)
 
