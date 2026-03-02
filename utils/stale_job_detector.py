@@ -11,7 +11,7 @@ STALE_THRESHOLD_MINUTES = 10
 def mark_stale_meetings():
     """
     Mark meetings stuck at 'processing' for too long as 'failed'.
-    Call this periodically or on app startup.
+    Calling this periodically or on app startup.
     """
     db = SessionLocal()
     try:
@@ -19,8 +19,7 @@ def mark_stale_meetings():
 
         stale_meetings = db.query(Meeting).filter(
             Meeting.processing_status == "processing",
-            Meeting.created_at < cutoff
-        ).all()
+            Meeting.created_at < cutoff).all()
 
         for meeting in stale_meetings:
             meeting.processing_status = "failed"
