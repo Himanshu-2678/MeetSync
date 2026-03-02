@@ -35,7 +35,7 @@ I created MeetSync to automate this process and turn raw meeting audio into acti
 
 1. The user uploads a meeting audio file
 2. Flask saves the file and immediately inserts a meeting record with status `processing`
-3. The job is enqueued to a Celery worker via Redis
+3. The job is enqueued to a Celery worker via Redis. In the demo deployment, the worker runs in the same service as the web app due to platform constraints.
 4. The user is redirected to a polling page that checks status every 3 seconds
 5. The worker transcribes the audio using Deepgram, then calls Gemini to extract structured minutes
 6. Gemini's response is validated against a strict Pydantic schema before being accepted
@@ -252,9 +252,26 @@ These can be queried directly:
 SELECT ROUND(AVG(processing_time_seconds)::numeric, 2) AS avg_seconds
 FROM meeting_metrics WHERE status = 'success';
 
--- Failure rate
-SELECT status, COUNT(*) FROM meeting_metrics GROUP BY status;
-
 -- Meetings that required Gemini retries
 SELECT meeting_id, gemini_retry_count FROM meeting_metrics WHERE gemini_retry_count > 0;
+
+-- Failure rate
+SELECT status, COUNT(*) FROM meeting_metrics GROUP BY status;
 ```
+
+## Deployment Notes (Render Free Tier)
+
+Render’s free tier does not support background worker services or interactive shells.  
+To keep the asynchronous architecture intact for demonstration purposes, the Celery worker is co-located with the Flask web service and runs in the same container.
+
+The web service start command launches both Gunicorn and the Celery worker process:
+```bash
+gunicorn app:app & celery -A worker.celery_app worker --loglevel=info --pool=solo
+```
+
+In a production setup, the Celery worker would run as a separate service and scale independently.  
+This deployment choice is a platform constraint, not an architectural limitation of the system.
+
+
+
+gunicorn app:app & celery -A worker.celery_app worker --loglevel=info --pool=solo
