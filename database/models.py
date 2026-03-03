@@ -16,7 +16,7 @@ class Meeting(Base):
     session_id        = Column(String(36), nullable=True, index=True)  
 
     tasks = relationship("Task", back_populates="meeting", cascade="all, delete-orphan")
-    metrics = relationship("Meeting Metrics", back_populates="meeting", uselist=False, cascade="all, delete-orphan")
+    metrics = relationship("MeetingMetrics", back_populates="meeting", uselist=False, cascade="all, delete-orphan")
     __table_args__ = (
         Index("ix_meetings_processing_status", "processing_status"),
     )
