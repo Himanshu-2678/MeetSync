@@ -1,7 +1,4 @@
 #!/bin/bash
 
-# Start Celery worker in background
-celery -A worker:celery_app worker --loglevel=info &
-
-# Start Gunicorn in foreground
-gunicorn app:app --bind 0.0.0.0:$PORT
+# Start Gunicorn
+gunicorn app:app --bind 0.0.0.0:$PORT --workers=1 --threads=2
