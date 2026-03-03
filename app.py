@@ -24,7 +24,7 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 with app.app_context():
     init_db()
-    
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s")
@@ -182,7 +182,6 @@ def api_tasks():
     finally:
         db.close()
 
-
 # Meeting history page
 @app.route("/history")
 def history():
@@ -302,6 +301,12 @@ def meeting_result(meeting_id):
         return render_template("result.html", meeting=meeting, tasks=tasks)
     finally:
         db.close()
+
+
+@app.route("/new")
+def new_meeting():
+    session.pop('last_meeting_id', None)
+    return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
