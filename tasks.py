@@ -1,4 +1,3 @@
-from worker import celery_app
 from database.connection import SessionLocal
 from database.models import Meeting, Task
 from summarizer import summarize_text
@@ -27,7 +26,6 @@ def parse_deadline(raw: str):
         return None
 
 
-@celery_app.task
 def process_meeting(meeting_id: int, file_path: str):
     logger.info(f"Worker picked up meeting {meeting_id}")
     start_time = time.time()
@@ -90,7 +88,7 @@ def process_meeting(meeting_id: int, file_path: str):
         summary = result["summary"]
         raw_tasks = result["tasks"]
 
-        # Step 3: Doing Single transaction
+        # Step 3: Single transaction
         try:
             meeting.transcript = transcript
             meeting.summary = summary
@@ -113,7 +111,6 @@ def process_meeting(meeting_id: int, file_path: str):
             logger.info(f"Meeting {meeting_id} completed in {round(processing_time, 2)}s, "
                         f"{len(raw_tasks)} tasks inserted")
 
-            # Saving the success metrics
             save_metrics(
                 meeting_id=meeting_id,
                 status="success",
