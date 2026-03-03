@@ -3,6 +3,8 @@ import io
 from dotenv import load_dotenv
 load_dotenv()
 
+import uuid
+
 from database.init_db import init_db
 
 from sqlalchemy import func as sa_func
@@ -15,6 +17,7 @@ import logging
 from database.connection import SessionLocal
 from database.models import Meeting, Task
 from tasks import process_meeting
+import threading
 
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
@@ -35,6 +38,12 @@ upload_folder = 'uploads'
 os.makedirs(upload_folder, exist_ok=True)
 
 
+def get_session_id():
+    if "session_id" not in session:
+        session["session_id"] = str(uuid.uuid4())
+    return session["session_id"]
+
+
 def scheduled_stale_check():
     with app.app_context():
         mark_stale_meetings()
@@ -53,11 +62,18 @@ scheduled_stale_check()
 
 # Shut down scheduler cleanly when app exits
 atexit.register(lambda: scheduler.shutdown())
+
+
 @app.route("/download/<int:meeting_id>")
 def download_summary(meeting_id):
     db = SessionLocal()
     try:
-        meeting = db.query(Meeting).filter_by(id=meeting_id).first()
+        # Session validation — only owner can download
+        meeting = db.query(Meeting).filter_by(
+            id=meeting_id,
+            session_id=get_session_id()
+        ).first()
+
         if not meeting or meeting.processing_status != "success":
             return "No summary available.", 400
 
@@ -90,17 +106,19 @@ def download_summary(meeting_id):
         db.close()
 
 
-# API: Meeting history 
+# API: Meeting history
 @app.route("/api/meetings")
 def api_meetings():
     page = request.args.get("page", 1, type=int)
     per_page = 10
+    sid = get_session_id()
 
     db = SessionLocal()
     try:
-        total = db.query(Meeting).count()
+        total = db.query(Meeting).filter_by(session_id=sid).count()
         meetings = (
             db.query(Meeting)
+            .filter_by(session_id=sid)
             .order_by(Meeting.created_at.desc())
             .offset((page - 1) * per_page)
             .limit(per_page)
@@ -111,7 +129,7 @@ def api_meetings():
             "page": page,
             "per_page": per_page,
             "total": total,
-            "total_pages": -(-total // per_page),  # ceiling division
+            "total_pages": -(-total // per_page),
             "meetings": [
                 {
                     "id": m.id,
@@ -133,13 +151,14 @@ def api_meetings():
 # Tasks with filters
 @app.route("/api/tasks")
 def api_tasks():
-    priority = request.args.get("priority")        # High / Medium / Low
-    status   = request.args.get("status")          # pending / completed
-    overdue  = request.args.get("overdue")         # true / false
+    priority = request.args.get("priority")
+    status   = request.args.get("status")
+    overdue  = request.args.get("overdue")
+    sid = get_session_id()
 
     db = SessionLocal()
     try:
-        query = db.query(Task).join(Meeting)
+        query = db.query(Task).join(Meeting).filter(Meeting.session_id == sid)
 
         if priority:
             query = query.filter(Task.priority == priority)
@@ -182,6 +201,7 @@ def api_tasks():
     finally:
         db.close()
 
+
 # Meeting history page
 @app.route("/history")
 def history():
@@ -198,13 +218,20 @@ def task_search():
 def home():
     if request.method == "POST":
         audio_file = request.files['audio']
-        filename = audio_file.filename
-        file_path = os.path.join(upload_folder, filename)
+
+        # Prevent filename collisions across users
+        original_filename = audio_file.filename
+        unique_filename = f"{uuid.uuid4()}_{original_filename}"
+        file_path = os.path.join(upload_folder, unique_filename)
         audio_file.save(file_path)
 
         db = SessionLocal()
         try:
-            meeting = Meeting(filename=filename, processing_status="processing")
+            meeting = Meeting(
+                filename=original_filename,    # show original name in UI
+                processing_status="processing",
+                session_id=get_session_id()    # tag with browser session
+            )
             db.add(meeting)
             db.commit()
             db.refresh(meeting)
@@ -213,13 +240,14 @@ def home():
         finally:
             db.close()
 
-        # Fix 2: Graceful enqueue failure
         try:
-            process_meeting.delay(meeting_id, file_path)
-            logger.info(f"Meeting {meeting_id} enqueued successfully")
-            session['last_meeting_id'] = meeting_id  # ← store in session
+            thread = threading.Thread(target=process_meeting, args=(meeting_id, file_path))
+            thread.daemon = True
+            thread.start()
+            logger.info(f"Meeting {meeting_id} thread started successfully")
+            session['last_meeting_id'] = meeting_id
         except Exception as e:
-            logger.error(f"Failed to enqueue meeting {meeting_id}: {e}")
+            logger.error(f"Failed to start thread for meeting {meeting_id}: {e}")
             db = SessionLocal()
             try:
                 meeting = db.query(Meeting).filter_by(id=meeting_id).first()
@@ -227,7 +255,7 @@ def home():
                     meeting.processing_status = "failed"
                     db.commit()
             except Exception as inner_e:
-                logger.error(f"Failed to mark meeting as failed after enqueue error: {inner_e}")
+                logger.error(f"Failed to mark meeting as failed after thread error: {inner_e}")
                 db.rollback()
             finally:
                 db.close()
@@ -259,7 +287,12 @@ def check_status(meeting_id):
     """JSON endpoint polled by frontend."""
     db = SessionLocal()
     try:
-        meeting = db.query(Meeting).filter_by(id=meeting_id).first()
+
+        meeting = db.query(Meeting).filter_by(
+            id=meeting_id,
+            session_id=get_session_id()
+        ).first()
+
         if not meeting:
             return jsonify({"status": "not_found"}), 404
 
@@ -290,10 +323,15 @@ def check_status(meeting_id):
 
 @app.route("/result/<int:meeting_id>")
 def meeting_result(meeting_id):
-    """Final result page."""
+
     db = SessionLocal()
     try:
-        meeting = db.query(Meeting).filter_by(id=meeting_id).first()
+        # Session validation — only owner can view result
+        meeting = db.query(Meeting).filter_by(
+            id=meeting_id,
+            session_id=get_session_id()
+        ).first()
+
         if not meeting or meeting.processing_status != "success":
             return redirect(url_for("meeting_status", meeting_id=meeting_id))
 
