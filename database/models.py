@@ -13,9 +13,10 @@ class Meeting(Base):
     summary           = Column(Text, nullable=True)
     processing_status = Column(String(20), nullable=False, default="processing")
     created_at        = Column(TIMESTAMP, server_default=func.now())
+    session_id        = Column(String(36), nullable=True, index=True)  
 
     tasks = relationship("Task", back_populates="meeting", cascade="all, delete-orphan")
-    metrics = relationship("MeetingMetrics", back_populates="meeting", uselist=False, cascade="all, delete-orphan")
+    metrics = relationship("Meeting Metrics", back_populates="meeting", uselist=False, cascade="all, delete-orphan")
     __table_args__ = (
         Index("ix_meetings_processing_status", "processing_status"),
     )
