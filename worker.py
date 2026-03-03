@@ -1,5 +1,6 @@
 from celery import Celery
 import os
+import ssl
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -18,7 +19,11 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-
-    broker_use_ssl={"ssl_cert_reqs": None},
-    redis_backend_use_ssl={"ssl_cert_reqs": None},
 )
+
+celery_app.conf.broker_transport_options = {
+    "ssl_cert_reqs": ssl.CERT_NONE
+}
+celery_app.conf.redis_backend_use_ssl = {
+    "ssl_cert_reqs": ssl.CERT_NONE
+}
