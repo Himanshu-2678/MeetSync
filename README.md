@@ -32,7 +32,7 @@ MeetSync automates this process and turns raw meeting audio into actionable meet
 
 1. The user uploads a meeting audio file
 2. Flask saves the file and immediately inserts a meeting record with status `processing`
-3. A background thread is started to handle the heavy work without blocking the request
+3. A background worker thread is started to process the meeting asynchronously. The worker is wrapped with crash protection so failures are logged instead of silently terminating the job.
 4. The user is redirected to a polling page that checks status every 3 seconds
 5. The worker transcribes the audio using Deepgram, then calls Gemini to extract structured minutes
 6. Gemini response is validated against a strict Pydantic schema before being accepted
@@ -71,7 +71,8 @@ MeetSync/
 |
 |-- utils/
 |   |-- metrics.py                # Save and log processing metrics
-|   `-- stale_job_detector.py     # Mark stuck jobs as failed
+|   |-- stale_job_detector.py     # Mark stuck jobs as failed
+|   `-- db_safe_commit.py        # prevent app crash when the database connection temporarily fails.
 |
 |-- templates/
 |   |-- index.html                # Upload page
@@ -88,12 +89,11 @@ MeetSync/
 
 ---
 
-## Screenshots
+## Demo
 
-![MeetSync-Home](assets/main_page(1).png)
-![MeetSync-History](assets/main_page(2).png)
-
----
+[![MeetSync-Home](assets/meetsync_main_page.png)](https://youtu.be/fYaQ3g40ehY)
+[![MeetSync-History](assets/meetsync_summary.png)](https://youtu.be/fYaQ3g40ehY)
+_click the image to play the video demo._
 
 ## Setup Instructions
 
@@ -215,6 +215,12 @@ The app uses a UUID stored in the Flask session cookie to isolate each browser's
 
 Every failure point has an explicit outcome. If transcription fails, the meeting is marked `failed` immediately. If Gemini returns malformed JSON, the system retries up to two times before giving up. If the retry limit is exhausted, the failure is recorded with a reason and not silently converted into a partial result. Meeting updates and task inserts happen in a single database transaction, so there is no state where a meeting shows `success` but has no tasks.
 
+### Database reliability
+
+The deployed system uses Neon PostgreSQL, which automatically suspends idle connections on the free tier. To prevent failures caused by stale connections, SQLAlchemy is configured with connection health checks (`pool_pre_ping`) and periodic connection recycling (`pool_recycle`).
+
+All database writes are wrapped in a `safe_commit()` helper that performs rollback and retry logic if the connection temporarily fails. This prevents transient infrastructure issues from crashing the request lifecycle or background worker threads.
+
 ### What breaks at 1000 meetings per day
 
 At that volume, a few things would need to change:
@@ -265,6 +271,8 @@ SELECT status, COUNT(*) FROM meeting_metrics GROUP BY status;
 
 The live deployment runs on Render free tier with Neon PostgreSQL.
 
-Render free tier does not support background worker services. The Celery-based architecture built for this project exceeded the 512MB memory limit when running Gunicorn and a Celery worker in the same container. The deployed version uses Python threading instead. The full Celery implementation is preserved on the `celery-arch` branch.
+Render free tier does not support background worker services. The Celery-based architecture built for this project exceeded the 512MB memory limit when running Gunicorn and a Celery worker in the same container. The deployed version uses Python threading instead. The full Celery + Redis implementation is preserved on the `celery-arch` branch.
+
+Because Neon suspends compute when idle on the free tier, database connections can occasionally become stale. The application configures SQLAlchemy connection pooling with health checks to automatically detect and refresh dropped connections. This prevents errors such as `SSL connection has been closed unexpectedly` during long-running processing jobs.
 
 The database schema is created automatically on startup via `init_db()`. Redeployment to a new database requires only updating the `DATABASE_URL` environment variable.
