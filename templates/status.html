@@ -1,130 +1,326 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>MeetSync — Processing</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background-color: #ececec;
-            color: #1f2937;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MeetSync — Processing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .card {
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 40px 50px;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.07);
-            text-align: center;
-            max-width: 480px;
-            width: 100%;
-        }
+    :root {
+      --bg:           #F0F2FF;
+      --surface:      #FFFFFF;
+      --border:       #E0E4F5;
+      --border-light: #ECF0FF;
+      --primary:      #4F46E5;
+      --primary-2:    #7C3AED;
+      --primary-light:#EEF2FF;
+      --text:         #111827;
+      --text-muted:   #6B7280;
+      --danger:       #DC2626;
+      --danger-bg:    #FEF2F2;
+      --radius:       16px;
+      --radius-sm:    8px;
+    }
 
-        h2 { margin-bottom: 10px; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
 
-        .status-text {
-            font-size: 0.95rem;
-            color: #6b7280;
-            margin-bottom: 30px;
-        }
+    .logo {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.2rem;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+      margin-bottom: 40px;
+    }
 
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border: 5px solid #e5e7eb;
-            border-top-color: #4C516D;
-            border-radius: 50%;
-            animation: spin 0.9s linear infinite;
-            margin: 0 auto 24px;
-        }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 48px 52px;
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+      box-shadow: 0 8px 40px rgba(79,70,229,0.10);
+    }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+    /* Animated ring */
+    .ring-wrap {
+      width: 72px; height: 72px;
+      margin: 0 auto 28px;
+      position: relative;
+    }
 
-        .error-box {
-            background: #fee2e2;
-            border: 1px solid #fca5a5;
-            border-radius: 8px;
-            padding: 14px 18px;
-            color: #dc2626;
-            font-size: 0.9rem;
-            display: none;
-        }
+    .ring-track {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      border: 3px solid var(--border);
+      position: absolute;
+    }
 
-        .btn {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #4C516D;
-            color: white;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-        }
-    </style>
+    .ring-spin {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      border-top-color: var(--primary);
+      border-right-color: var(--primary-2);
+      position: absolute;
+      animation: spin 1s cubic-bezier(0.4,0,0.2,1) infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ring-icon {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    /* Steps */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: 28px 0 0;
+      text-align: left;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .step:last-child { border-bottom: none; }
+
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+
+    .step.done .step-dot    { background: #10B981; }
+    .step.active .step-dot  { background: var(--primary); animation: pulse 1.2s ease infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(79,70,229,0.4); }
+      50%       { opacity: 0.8; box-shadow: 0 0 0 5px rgba(79,70,229,0); }
+    }
+
+    .step-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .step.done .step-label   { color: #10B981; font-weight: 500; }
+    .step.active .step-label { color: var(--primary); font-weight: 500; }
+
+    .step-check {
+      margin-left: auto;
+      font-size: 0.85rem;
+      display: none;
+    }
+
+    .step.done .step-check { display: block; color: #10B981; }
+
+    /* Title */
+    .card-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--text);
+      letter-spacing: -0.3px;
+      margin-bottom: 6px;
+    }
+
+    .card-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Timer */
+    .timer {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 20px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 20px;
+    }
+
+    /* Error */
+    .error-box {
+      display: none;
+      background: var(--danger-bg);
+      border: 1px solid #FECACA;
+      border-radius: var(--radius-sm);
+      padding: 16px 18px;
+      color: var(--danger);
+      font-size: 0.88rem;
+      margin-top: 20px;
+      text-align: left;
+    }
+
+    .btn-retry {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 16px;
+      padding: 9px 18px;
+      background: var(--danger);
+      color: #fff;
+      border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
-    <div class="card">
-        <div class="spinner" id="spinner"></div>
-        <h2>Processing your meeting</h2>
-        <p class="status-text" id="status-text">
-            Transcribing audio and extracting action items...
-        </p>
-        <div class="error-box" id="error-box">
-            ⚠️ Processing failed. Please try again.
-            <br>
-            <a href="/" class="btn" style="margin-top:12px">← Upload Again</a>
-        </div>
+
+  <div class="logo">MeetSync</div>
+
+  <div class="card">
+    <div class="ring-wrap" id="ring-wrap">
+      <div class="ring-track"></div>
+      <div class="ring-spin" id="ring-spin"></div>
+      <div class="ring-icon">🎙</div>
     </div>
 
-    <script>
-        const meetingId = {{ meeting_id }};
-        const pollInterval = 3000;       // poll every 3 seconds
-        const maxWaitTime = 300000;      // stop after 5 minutes
-        const startTime = Date.now();
+    <div class="card-title">Analysing your meeting</div>
+    <p class="card-sub">This usually takes under a minute</p>
 
-        async function checkStatus() {
-            // Fix 4: Stop polling after maxWaitTime
-            if (Date.now() - startTime > maxWaitTime) {
-                document.getElementById("spinner").style.display = "none";
-                document.getElementById("status-text").style.display = "none";
-                document.getElementById("error-box").innerHTML = `
-                    ⚠️ Processing is taking longer than expected. 
-                    Please check back later or <a href="/">try uploading again</a>.
-                `;
-                document.getElementById("error-box").style.display = "block";
-                return; // stop polling
-            }
+    <div class="timer" id="timer">0s elapsed</div>
 
-            try {
-                const res = await fetch(`/status/${meetingId}`);
-                const data = await res.json();
+    <div class="steps" id="steps">
+      <div class="step done" id="step-upload">
+        <div class="step-dot"></div>
+        <span class="step-label">Audio uploaded</span>
+        <span class="step-check">✓</span>
+      </div>
+      <div class="step active" id="step-transcribe">
+        <div class="step-dot"></div>
+        <span class="step-label">Transcribing audio</span>
+        <span class="step-check">✓</span>
+      </div>
+      <div class="step" id="step-summarise">
+        <div class="step-dot"></div>
+        <span class="step-label">Generating summary</span>
+        <span class="step-check">✓</span>
+      </div>
+      <div class="step" id="step-tasks">
+        <div class="step-dot"></div>
+        <span class="step-label">Extracting action items</span>
+        <span class="step-check">✓</span>
+      </div>
+    </div>
 
-                if (data.status === "success") {
-                    window.location.href = `/result/${meetingId}`;
-                } else if (data.status === "failed") {
-                    document.getElementById("spinner").style.display = "none";
-                    document.getElementById("status-text").style.display = "none";
-                    document.getElementById("error-box").style.display = "block";
-                } else {
-                    // Update status text to show elapsed time
-                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    document.getElementById("status-text").textContent =
-                        `Transcribing audio and extracting action items... (${elapsed}s)`;
-                    setTimeout(checkStatus, pollInterval);
-                }
-            } catch (err) {
-                setTimeout(checkStatus, pollInterval);
-            }
+    <div class="error-box" id="error-box">
+      <strong>Processing failed.</strong><br>
+      Something went wrong with your audio file.
+      <br>
+      <a href="/" class="btn-retry">← Try again</a>
+    </div>
+  </div>
+
+  <script>
+    const meetingId    = {{ meeting_id }};
+    const pollInterval = 3000;
+    const maxWait      = 300000;
+    const start        = Date.now();
+
+    // Advance steps over time for visual feedback
+    const steps = ['step-transcribe','step-summarise','step-tasks'];
+    let stepIdx = 0;
+
+    function advanceStep() {
+      if (stepIdx < steps.length - 1) {
+        document.getElementById(steps[stepIdx]).classList.replace('active','done');
+        stepIdx++;
+        document.getElementById(steps[stepIdx]).classList.add('active');
+      }
+    }
+
+    // Update timer
+    const timerEl = document.getElementById('timer');
+    const timerInterval = setInterval(() => {
+      timerEl.textContent = Math.floor((Date.now() - start) / 1000) + 's elapsed';
+    }, 1000);
+
+    // Advance step every ~8s for perception
+    const stepInterval = setInterval(advanceStep, 8000);
+
+    async function checkStatus() {
+      if (Date.now() - start > maxWait) {
+        showError('Processing timed out. Please try uploading again.');
+        return;
+      }
+
+      try {
+        const res  = await fetch(`/status/${meetingId}`);
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          clearInterval(timerInterval);
+          clearInterval(stepInterval);
+          // Mark all done
+          steps.forEach(s => {
+            const el = document.getElementById(s);
+            el.classList.remove('active');
+            el.classList.add('done');
+          });
+          setTimeout(() => { window.location.href = `/result/${meetingId}`; }, 400);
+        } else if (data.status === 'failed') {
+          showError('Processing failed. Please try a different file.');
+        } else {
+          setTimeout(checkStatus, pollInterval);
         }
+      } catch {
+        setTimeout(checkStatus, pollInterval);
+      }
+    }
 
-        checkStatus();
-    </script>
+    function showError(msg) {
+      clearInterval(timerInterval);
+      clearInterval(stepInterval);
+      document.getElementById('ring-spin').style.display = 'none';
+      document.getElementById('timer').style.display = 'none';
+      const eb = document.getElementById('error-box');
+      eb.querySelector('strong').nextSibling.textContent = '\n' + msg;
+      eb.style.display = 'block';
+    }
+
+    checkStatus();
+  </script>
 </body>
 </html>

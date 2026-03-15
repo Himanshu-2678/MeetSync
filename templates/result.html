@@ -1,144 +1,358 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>MeetSync — {{ meeting.filename }}</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background-color: #ececec;
-            color: #1f2937;
-        }
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MeetSync — {{ meeting.filename }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .container {
-            max-width: 900px;
-            margin: auto;
-            padding: 40px 20px;
-        }
+    :root {
+      --bg:           #F0F2FF;
+      --surface:      #FFFFFF;
+      --border:       #E0E4F5;
+      --border-light: #ECF0FF;
+      --primary:      #4F46E5;
+      --primary-2:    #7C3AED;
+      --primary-light:#EEF2FF;
+      --text:         #111827;
+      --text-muted:   #6B7280;
+      --success:      #059669;
+      --warning:      #D97706;
+      --danger:       #DC2626;
+      --success-bg:   #ECFDF5;
+      --warning-bg:   #FFFBEB;
+      --danger-bg:    #FEF2F2;
+      --radius:       14px;
+      --radius-sm:    8px;
+      --shadow:       0 4px 24px rgba(79,70,229,0.07);
+    }
 
-        .header { text-align: center; margin-bottom: 40px; }
-        h1 { font-size: 2.2rem; margin-bottom: 6px; }
-        .meta { font-size: 0.88rem; color: #6b7280; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
 
-        .card {
-            background: #ffffff;
-            border-radius: 10px;
-            padding: 24px;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.05);
-            margin-bottom: 24px;
-        }
+    nav {
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 62px;
+    }
 
-        h3 { margin-top: 0; font-size: 1.1rem; }
+    .nav-logo {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.3rem;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
 
-        .summary-text { line-height: 1.7; font-size: 0.97rem; }
+    .nav-links { display: flex; gap: 6px; }
 
-        .task-card {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 16px 18px;
-            margin-bottom: 14px;
-        }
+    .nav-link {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      transition: background 0.2s, color 0.2s;
+    }
 
-        .task-card.priority-high   { border-left: 4px solid #ef4444; }
-        .task-card.priority-medium { border-left: 4px solid #f59e0b; }
-        .task-card.priority-low    { border-left: 4px solid #10b981; }
+    .nav-link:hover { background: var(--primary-light); color: var(--primary); }
 
-        .task-title {
-            font-weight: 600;
-            font-size: 0.97rem;
-            margin-bottom: 10px;
-            color: #111827;
-        }
+    /* Meta bar */
+    .meta-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
 
-        .task-meta { display: flex; flex-wrap: wrap; gap: 10px; }
+    .meta-file {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-        .meta-item {
-            font-size: 0.85rem;
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 5px;
-            padding: 4px 10px;
-            color: #374151;
-        }
+    .meta-icon {
+      width: 36px; height: 36px;
+      background: var(--primary-light);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
 
-        .meta-item span { font-weight: 600; color: #4C516D; }
+    .meta-filename {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text);
+    }
 
-        .badge {
-            font-size: 0.75rem;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 12px;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
+    .meta-date {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
 
-        .badge-high   { background: #fee2e2; color: #dc2626; }
-        .badge-medium { background: #fef3c7; color: #d97706; }
-        .badge-low    { background: #d1fae5; color: #059669; }
+    .meta-actions { display: flex; gap: 8px; }
 
-        .no-tasks { color: #6b7280; font-style: italic; font-size: 0.9rem; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
 
-        .divider { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+    .btn:hover { opacity: 0.85; }
+    .btn-ghost  { background: var(--primary-light); color: var(--primary); }
+    .btn-dark   { background: var(--text); color: #fff; }
 
-        .actions { display: flex; gap: 12px; margin-top: 10px; }
+    /* Main layout */
+    .main { max-width: 820px; margin: 0 auto; padding: 32px 24px 80px; }
 
-        .btn {
-            padding: 10px 18px;
-            border-radius: 6px;
-            font-size: 14px;
-            text-decoration: none;
-            color: white;
-        }
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
 
-        .btn-dark    { background: #1f2937; }
-        .btn-primary { background: #4C516D; }
-    </style>
+    .section-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 16px;
+    }
+
+    .summary-text {
+      font-size: 0.93rem;
+      line-height: 1.75;
+      color: #374151;
+    }
+
+    /* Tasks */
+    .tasks-grid { display: flex; flex-direction: column; gap: 10px; }
+
+    .task-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #FAFBFF;
+      transition: box-shadow 0.2s;
+    }
+
+    .task-item:hover { box-shadow: var(--shadow); }
+
+    .task-item.p-high   { border-left: 3px solid var(--danger);  }
+    .task-item.p-medium { border-left: 3px solid var(--warning); }
+    .task-item.p-low    { border-left: 3px solid var(--success); }
+
+    .task-num {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .task-body { flex: 1; }
+
+    .task-title {
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: var(--text);
+      margin-bottom: 9px;
+      line-height: 1.4;
+    }
+
+    .task-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .chip {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: var(--border-light);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .chip strong { color: var(--text); font-weight: 600; }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+      margin-left: 8px;
+    }
+
+    .badge-high   { background: var(--danger-bg);  color: var(--danger);  }
+    .badge-medium { background: var(--warning-bg); color: var(--warning); }
+    .badge-low    { background: var(--success-bg); color: var(--success); }
+
+    .no-tasks {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 24px 0;
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 18px 20px;
+    }
+
+    .stat-num {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -1px;
+    }
+
+    .stat-label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
 
-        <div class="header">
-            <h1>MeetSync</h1>
-            <p class="meta">{{ meeting.filename }} &nbsp;·&nbsp; {{ meeting.created_at.strftime('%d %b %Y, %H:%M') }}</p>
-        </div>
-
-        <!-- Summary -->
-        <div class="card">
-            <h3>Meeting Summary</h3>
-            <p class="summary-text">{{ meeting.summary }}</p>
-
-            <hr class="divider">
-
-            <!-- Tasks -->
-            <h3>Action Items & Tasks</h3>
-            {% if tasks %}
-                {% for t in tasks %}
-                    {% set priority = t.priority | lower %}
-                    <div class="task-card priority-{{ priority }}">
-                        <div class="task-title">
-                            {{ loop.index }}. {{ t.description }}
-                            <span class="badge badge-{{ priority }}">{{ t.priority }}</span>
-                        </div>
-                        <div class="task-meta">
-                            <div class="meta-item"><span>Owner</span> &nbsp;{{ t.owner }}</div>
-                            <div class="meta-item"><span>Deadline</span> &nbsp;{{ t.deadline_raw or "Not specified" }}</div>
-                            <div class="meta-item"><span>Status</span> &nbsp;{{ t.status }}</div>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p class="no-tasks">No action items were identified in this meeting.</p>
-            {% endif %}
-
-            <div class="actions">
-                <a href="/download/{{ meeting.id }}" class="btn btn-dark">⬇ Download Summary</a>
-                <a href="/new" class="btn btn-primary">🎙 Upload New Meeting</a>
-                <a href="/history" class="btn btn-primary">📋 History</a>
-            </div>
-        </div>
-
+  <nav>
+    <span class="nav-logo">MeetSync</span>
+    <div class="nav-links">
+      <a href="/" class="nav-link">Upload</a>
+      <a href="/history" class="nav-link">History</a>
+      <a href="/tasks/search" class="nav-link">Tasks</a>
     </div>
+  </nav>
+
+  <!-- Meta bar -->
+  <div class="meta-bar">
+    <div class="meta-file">
+      <div class="meta-icon">🎙</div>
+      <div>
+        <div class="meta-filename">{{ meeting.filename }}</div>
+        <div class="meta-date">{{ meeting.created_at.strftime('%d %b %Y, %H:%M') }}</div>
+      </div>
+    </div>
+    <div class="meta-actions">
+      <a href="/download/{{ meeting.id }}" class="btn btn-dark">⬇ Download</a>
+      <a href="/" class="btn btn-ghost">+ New Meeting</a>
+      <a href="/history" class="btn btn-ghost">History</a>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num">{{ tasks | length }}</div>
+        <div class="stat-label">Action items</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">{{ tasks | selectattr('priority','equalto','High') | list | length }}</div>
+        <div class="stat-label">High priority</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">{{ tasks | selectattr('status','equalto','pending') | list | length }}</div>
+        <div class="stat-label">Pending</div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="card">
+      <div class="section-label">Meeting Summary</div>
+      <p class="summary-text">{{ meeting.summary }}</p>
+    </div>
+
+    <!-- Tasks -->
+    <div class="card">
+      <div class="section-label">Action Items</div>
+      {% if tasks %}
+        <div class="tasks-grid">
+          {% for t in tasks %}
+            {% set p = t.priority | lower %}
+            <div class="task-item p-{{ p }}">
+              <div class="task-num">{{ loop.index }}</div>
+              <div class="task-body">
+                <div class="task-title">
+                  {{ t.description }}
+                  <span class="badge badge-{{ p }}">{{ t.priority }}</span>
+                </div>
+                <div class="task-chips">
+                  <span class="chip"><strong>Owner</strong> {{ t.owner }}</span>
+                  <span class="chip"><strong>Due</strong> {{ t.deadline_raw or "Not specified" }}</span>
+                  <span class="chip"><strong>Status</strong> {{ t.status }}</span>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="no-tasks">No action items were identified in this meeting.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
 </body>
 </html>
