@@ -68,7 +68,7 @@ scheduler.add_job(
 scheduler.start()
 
 # Run once immediately on startup too
-scheduled_stale_check()
+threading.Thread(target=scheduled_stale_check, daemon=True).start()
 
 # Shut down scheduler cleanly when app exits
 atexit.register(lambda: scheduler.shutdown())
