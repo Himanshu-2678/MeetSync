@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, session
 from utils.db_safe_commit import safe_commit
+from datetime import datetime, timedelta, date
 import io
 from dotenv import load_dotenv
 load_dotenv()
@@ -9,7 +10,6 @@ import uuid
 from database.init_db import init_db
 
 from sqlalchemy import func as sa_func
-from datetime import date
 
 from utils.stale_job_detector import mark_stale_meetings
 import os
@@ -64,11 +64,13 @@ scheduler.add_job(
     trigger="interval",
     minutes=10,
     id="stale_job_detector",
-    replace_existing=True)
+    replace_existing=True,
+    next_run_time=datetime.now() + timedelta(seconds=30)
+)
 scheduler.start()
 
 # Run once immediately on startup too
-threading.Thread(target=scheduled_stale_check, daemon=True).start()
+##threading.Thread(target=scheduled_stale_check, daemon=True).start()
 
 # Shut down scheduler cleanly when app exits
 atexit.register(lambda: scheduler.shutdown())
