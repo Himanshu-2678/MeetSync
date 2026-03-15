@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, session
+from utils.db_safe_commit import safe_commit
 import io
 from dotenv import load_dotenv
 load_dotenv()
@@ -33,6 +34,15 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s")
 
 logger = logging.getLogger(__name__)
+
+def run_process_meeting(meeting_id, file_path):
+    try:
+        process_meeting(meeting_id, file_path)
+    except Exception as e:
+        logger.error(
+            f"Processing failed for meeting {meeting_id}: {e}",
+            exc_info=True
+        )
 
 upload_folder = 'uploads'
 os.makedirs(upload_folder, exist_ok=True)
@@ -191,7 +201,7 @@ def api_tasks():
                     "description": t.description,
                     "owner": t.owner,
                     "deadline_raw": t.deadline_raw,
-                    "deadline_parsed": t.deadline_parsed.strftime("%d %b %Y") if t.deadline_parsed else None,
+                    "deadline_parsed": t.deadline_parsed.isoformat() if t.deadline_parsed else None,
                     "priority": t.priority,
                     "status": t.status
                 }
@@ -226,22 +236,36 @@ def home():
         audio_file.save(file_path)
 
         db = SessionLocal()
+
         try:
             meeting = Meeting(
-                filename=original_filename,    # show original name in UI
+                filename=original_filename,
                 processing_status="processing",
-                session_id=get_session_id()    # tag with browser session
+                session_id=get_session_id()
             )
+
             db.add(meeting)
-            db.commit()
-            db.refresh(meeting)
-            meeting_id = meeting.id
-            logger.info(f"Meeting {meeting_id} inserted, enqueuing job")
+            success = safe_commit(db, logger)
+
+            if success:
+                db.refresh(meeting)
+                meeting_id = meeting.id
+                logger.info(f"Meeting {meeting_id} inserted")
+            else:
+                logger.error("DB insert failed. Cannot continue processing.")
+                return render_template(
+                    "index.html",
+                    error="Database temporarily unavailable. Please try again."
+                )
+
         finally:
             db.close()
 
         try:
-            thread = threading.Thread(target=process_meeting, args=(meeting_id, file_path))
+            thread = threading.Thread(
+                target=run_process_meeting,
+                args=(meeting_id, file_path)
+            )
             thread.daemon = True
             thread.start()
             logger.info(f"Meeting {meeting_id} thread started successfully")
@@ -250,10 +274,13 @@ def home():
             logger.error(f"Failed to start thread for meeting {meeting_id}: {e}")
             db = SessionLocal()
             try:
-                meeting = db.query(Meeting).filter_by(id=meeting_id).first()
+                if isinstance(meeting_id, int):
+                    meeting = db.query(Meeting).filter_by(id=meeting_id).first()
+                else:
+                    meeting = None
                 if meeting:
                     meeting.processing_status = "failed"
-                    db.commit()
+                    safe_commit(db, logger)
             except Exception as inner_e:
                 logger.error(f"Failed to mark meeting as failed after thread error: {inner_e}")
                 db.rollback()
@@ -263,7 +290,7 @@ def home():
 
         return redirect(url_for("meeting_status", meeting_id=meeting_id))
 
-    last_meeting_id = session.get('last_meeting_id')
+    """last_meeting_id = session.get('last_meeting_id')
     if last_meeting_id:
         db = SessionLocal()
         try:
@@ -272,7 +299,7 @@ def home():
                 return redirect(url_for("meeting_result", meeting_id=last_meeting_id))
         finally:
             db.close()
-
+"""
     return render_template("index.html", error=None)
 
 
@@ -297,23 +324,7 @@ def check_status(meeting_id):
             return jsonify({"status": "not_found"}), 404
 
         if meeting.processing_status == "success":
-            tasks = db.query(Task).filter_by(meeting_id=meeting_id).all()
-            return jsonify({
-                "status": "success",
-                "meeting_id": meeting_id,
-                "filename": meeting.filename,
-                "summary": meeting.summary,
-                "tasks": [
-                    {
-                        "task": t.description,
-                        "owner": t.owner,
-                        "deadline": t.deadline_raw or "Not specified",
-                        "priority": t.priority,
-                        "status": t.status
-                    }
-                    for t in tasks
-                ]
-            })
+            return jsonify({"status": "success"})
 
         return jsonify({"status": meeting.processing_status})
 
