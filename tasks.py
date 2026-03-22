@@ -6,6 +6,7 @@ from utils.metrics import save_metrics
 import dateparser
 import logging
 import time
+import re
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -95,15 +96,33 @@ def process_meeting(meeting_id: int, file_path: str):
             meeting.processing_status = "success"
 
             for t in raw_tasks:
-                deadline_raw = t.get("deadline", "")
+                # Skip empty tasks
+                description = t.get("task", "").strip()
+                if not description:
+                    continue
+
+                description = description.strip().capitalize()
+
+                # Take first owner if multiple listed
+                owner = t.get("owner", "Unassigned").strip()
+                if "/" in owner or "," in owner:
+                    owner = re.split(r'[/,]', owner)[0].strip()
+                if not owner:
+                    owner = "Unassigned"
+
+                # Keep raw deadline always — human readable even if parsing fails
+                deadline_raw = t.get("deadline_raw", "").strip() or "Not specified"
+                parsed_date = parse_deadline(deadline_raw)
+
                 task = Task(
                     meeting_id=meeting_id,
-                    description=t.get("task", ""),
-                    owner=t.get("owner", "Unassigned"),
+                    description=description,
+                    owner=owner,
                     deadline_raw=deadline_raw,
-                    deadline_parsed=parse_deadline(deadline_raw),
-                    priority=t.get("priority", "Medium"),
-                    status="pending")
+                    deadline_parsed=parsed_date,
+                    priority=t.get("priority") or None,
+                    status="open"
+                )
                 db.add(task)
 
             db.commit()
