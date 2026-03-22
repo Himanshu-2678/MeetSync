@@ -10,7 +10,7 @@ def transcribe_audio(file_path: str) -> str:
         audio_bytes = audio_file.read()
 
     response = requests.post(
-        "https://api.deepgram.com/v1/listen?punctuate=true&model=general",
+        "https://api.deepgram.com/v1/listen?punctuate=true&numerals=true&model=general",
         headers={
             "Authorization": f"Token {DEEPGRAM_API_KEY}",
             "Content-Type": "application/octet-stream",
