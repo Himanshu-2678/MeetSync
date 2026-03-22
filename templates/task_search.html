@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MeetSync — Task Search</title>
+  <title>MeetSync - Task Search</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
@@ -101,7 +101,6 @@
 
     .main { max-width: 820px; margin: 0 auto; padding: 0 24px 80px; }
 
-    /* Filter bar */
     .filter-bar {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -126,7 +125,7 @@
       letter-spacing: 0.8px;
     }
 
-    select {
+    input[type="text"], select {
       padding: 8px 12px;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
@@ -140,9 +139,8 @@
       min-width: 130px;
     }
 
-    select:focus { border-color: var(--primary); }
+    input[type="text"]:focus, select:focus { border-color: var(--primary); }
 
-    /* Toggle switch */
     .toggle-wrap {
       display: flex;
       align-items: center;
@@ -164,11 +162,7 @@
       height: 22px;
     }
 
-    .toggle input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
 
     .toggle-slider {
       position: absolute;
@@ -182,12 +176,10 @@
     .toggle-slider::after {
       content: '';
       position: absolute;
-      width: 16px;
-      height: 16px;
+      width: 16px; height: 16px;
       border-radius: 50%;
       background: white;
-      top: 3px;
-      left: 3px;
+      top: 3px; left: 3px;
       transition: transform 0.2s;
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
@@ -195,7 +187,6 @@
     .toggle input:checked + .toggle-slider { background: var(--primary); }
     .toggle input:checked + .toggle-slider::after { transform: translateX(18px); }
 
-    /* Search btn */
     .btn-search {
       padding: 9px 22px;
       background: linear-gradient(135deg, var(--primary), var(--primary-2));
@@ -212,7 +203,6 @@
 
     .btn-search:hover { opacity: 0.9; transform: translateY(-1px); }
 
-    /* Results */
     .results-meta {
       font-size: 0.82rem;
       color: var(--text-muted);
@@ -222,7 +212,6 @@
 
     .results-meta strong { color: var(--primary); font-family: 'Outfit', sans-serif; }
 
-    /* Task cards */
     .task-item {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -236,10 +225,6 @@
     }
 
     .task-item:hover { box-shadow: var(--shadow); }
-
-    .task-item.p-high   { border-left: 3px solid var(--danger);  }
-    .task-item.p-medium { border-left: 3px solid var(--warning); }
-    .task-item.p-low    { border-left: 3px solid var(--success); }
 
     .task-num {
       font-family: 'Outfit', sans-serif;
@@ -257,18 +242,11 @@
 
     .task-body { flex: 1; }
 
-    .task-title-row {
-      display: flex;
-      align-items: flex-start;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 9px;
-    }
-
     .task-title {
       font-weight: 500;
       font-size: 0.9rem;
       color: var(--text);
+      margin-bottom: 9px;
       line-height: 1.4;
     }
 
@@ -281,28 +259,13 @@
       background: var(--border-light);
       color: var(--text-muted);
       border: 1px solid var(--border);
+      white-space: normal;
+      word-break: break-word;
     }
 
     .chip strong { color: var(--text); font-weight: 600; }
-
-    .chip a {
-      color: var(--primary);
-      text-decoration: none;
-      font-weight: 600;
-    }
-
+    .chip a { color: var(--primary); text-decoration: none; font-weight: 600; }
     .chip a:hover { text-decoration: underline; }
-
-    .badge {
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 3px 9px;
-      border-radius: 20px;
-    }
-
-    .badge-high   { background: var(--danger-bg);  color: var(--danger);  }
-    .badge-medium { background: var(--warning-bg); color: var(--warning); }
-    .badge-low    { background: var(--success-bg); color: var(--success); }
 
     .overdue-badge {
       font-size: 0.7rem;
@@ -311,9 +274,9 @@
       border-radius: 20px;
       background: var(--danger-bg);
       color: var(--danger);
+      margin-left: 8px;
     }
 
-    /* States */
     .state-box {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -353,27 +316,25 @@
 
   <div class="main">
 
-    <!-- Filter bar -->
     <div class="filter-bar">
+
+      <!-- Owner search -->
       <div class="filter-group">
-        <span class="filter-label">Priority</span>
-        <select id="filter-priority">
-          <option value="">All priorities</option>
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
+        <span class="filter-label">Owner</span>
+        <input type="text" id="filter-owner" placeholder="e.g. Sarah" />
       </div>
 
+      <!-- Status -->
       <div class="filter-group">
         <span class="filter-label">Status</span>
         <select id="filter-status">
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
+          <option value="">All</option>
+          <option value="open">Open</option>
           <option value="completed">Completed</option>
         </select>
       </div>
 
+      <!-- Overdue -->
       <div class="filter-group">
         <span class="filter-label">Overdue</span>
         <div class="toggle-wrap">
@@ -400,17 +361,15 @@
   </div>
 
   <script>
-    let taskCount = 0;
-
     async function searchTasks() {
-      const priority = document.getElementById('filter-priority').value;
-      const status   = document.getElementById('filter-status').value;
-      const overdue  = document.getElementById('filter-overdue').checked;
+      const owner  = document.getElementById('filter-owner').value.trim();
+      const status = document.getElementById('filter-status').value;
+      const overdue = document.getElementById('filter-overdue').checked;
 
       let url = '/api/tasks?';
-      if (priority) url += `priority=${priority}&`;
-      if (status)   url += `status=${status}&`;
-      if (overdue)  url += `overdue=true&`;
+      if (owner)  url += `owner=${encodeURIComponent(owner)}&`;
+      if (status) url += `status=${status}&`;
+      if (overdue) url += `overdue=true&`;
 
       document.getElementById('results-list').innerHTML = `
         <div class="state-box">
@@ -436,18 +395,16 @@
       }
 
       document.getElementById('results-list').innerHTML = data.tasks.map((t, i) => {
-        const p = t.priority.toLowerCase();
         const isOverdue = t.deadline_parsed &&
           new Date(t.deadline_parsed) < new Date() &&
           t.status !== 'completed';
 
         return `
-          <div class="task-item p-${p}">
+          <div class="task-item">
             <div class="task-num">${i + 1}</div>
             <div class="task-body">
-              <div class="task-title-row">
-                <span class="task-title">${t.description}</span>
-                <span class="badge badge-${p}">${t.priority}</span>
+              <div class="task-title">
+                ${t.description}
                 ${isOverdue ? '<span class="overdue-badge">⚠ Overdue</span>' : ''}
               </div>
               <div class="task-chips">
