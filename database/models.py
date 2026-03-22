@@ -11,7 +11,7 @@ class Meeting(Base):
     filename          = Column(String(255), nullable=False)
     transcript        = Column(Text, nullable=True)
     summary           = Column(Text, nullable=True)
-    processing_status = Column(String(20), nullable=False, default="processing")
+    processing_status = Column(String(20), nullable=False, default="open")
     created_at        = Column(TIMESTAMP, server_default=func.now())
     session_id        = Column(String(36), nullable=True, index=True)  
 
@@ -20,7 +20,6 @@ class Meeting(Base):
     __table_args__ = (
         Index("ix_meetings_processing_status", "processing_status"),
     )
-
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -31,7 +30,7 @@ class Task(Base):
     owner           = Column(String(255), nullable=False)
     deadline_raw    = Column(Text, nullable=True)
     deadline_parsed = Column(Date, nullable=True)
-    priority        = Column(String(10), nullable=False)
+    priority = Column(String(10), nullable=True)
     status          = Column(String(20), nullable=False, default="pending")
     created_at      = Column(TIMESTAMP, server_default=func.now())
 
