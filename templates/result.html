@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MeetSync — {{ meeting.filename }}</title>
+  <title>MeetSync - {{ meeting.filename }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
@@ -218,6 +218,10 @@
       background: var(--border-light);
       color: var(--text-muted);
       border: 1px solid var(--border);
+      max-width: 300px;        
+      overflow: hidden;        
+      text-overflow: ellipsis; 
+      white-space: nowrap;     
     }
 
     .chip strong { color: var(--text); font-weight: 600; }
@@ -271,6 +275,17 @@
       color: var(--text-muted);
       margin-top: 2px;
     }
+
+    .badge-confidence-high { 
+      background: #EEF2FF; 
+      color: #4F46E5; 
+      border: 1px solid #C7D2FE;
+    }
+    .badge-confidence-low { 
+      background: #F9FAFB; 
+      color: #9CA3AF; 
+      border: 1px solid #E5E7EB;
+    }
   </style>
 </head>
 <body>
@@ -309,12 +324,14 @@
         <div class="stat-label">Action items</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">{{ tasks | selectattr('priority','equalto','High') | list | length }}</div>
+        <div class="stat-num">{{ tasks | selectattr('priority','defined') | selectattr('priority','equalto','High') | list | length }}</div>
         <div class="stat-label">High priority</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">{{ tasks | selectattr('status','equalto','pending') | list | length }}</div>
-        <div class="stat-label">Pending</div>
+        <div class="stat-num">
+          {{ tasks | rejectattr('deadline_raw', 'equalto', 'Not specified') | list | length }}
+        </div>
+        <div class="stat-label">With deadlines</div>
       </div>
     </div>
 
@@ -330,13 +347,15 @@
       {% if tasks %}
         <div class="tasks-grid">
           {% for t in tasks %}
-            {% set p = t.priority | lower %}
+            {% set p = (t.priority or 'unspecified') | lower %}
             <div class="task-item p-{{ p }}">
               <div class="task-num">{{ loop.index }}</div>
               <div class="task-body">
                 <div class="task-title">
                   {{ t.description }}
-                  <span class="badge badge-{{ p }}">{{ t.priority }}</span>
+                  {% if t.priority %}
+                    <span class="badge badge-{{ p }}">{{ t.priority }}</span>
+                  {% endif %}
                 </div>
                 <div class="task-chips">
                   <span class="chip"><strong>Owner</strong> {{ t.owner }}</span>
