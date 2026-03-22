@@ -16,7 +16,7 @@ import os
 import logging
 
 from database.connection import SessionLocal
-from database.models import Meeting, Task
+from database.models import Meeting, Task, MeetingMetrics
 from tasks import process_meeting
 import threading
 
@@ -163,7 +163,7 @@ def api_meetings():
 # Tasks with filters
 @app.route("/api/tasks")
 def api_tasks():
-    priority = request.args.get("priority")
+    owner    = request.args.get("owner")
     status   = request.args.get("status")
     overdue  = request.args.get("overdue")
     sid = get_session_id()
@@ -172,8 +172,8 @@ def api_tasks():
     try:
         query = db.query(Task).join(Meeting).filter(Meeting.session_id == sid)
 
-        if priority:
-            query = query.filter(Task.priority == priority)
+        if owner:
+            query = query.filter(Task.owner.ilike(f"%{owner}%"))
 
         if status:
             query = query.filter(Task.status == status)
@@ -190,11 +190,6 @@ def api_tasks():
 
         return jsonify({
             "count": len(tasks),
-            "filters": {
-                "priority": priority,
-                "status": status,
-                "overdue": overdue
-            },
             "tasks": [
                 {
                     "id": t.id,
@@ -359,6 +354,55 @@ def new_meeting():
     session.pop('last_meeting_id', None)
     return redirect(url_for("home"))
 
+
+@app.route("/api/stats")
+def api_stats():
+    db = SessionLocal()
+    try:
+        total_meetings = db.query(Meeting).filter_by(
+            processing_status="success"
+        ).count()
+
+        metrics = db.query(MeetingMetrics).filter_by(status="success").all()
+
+        total_words = sum(
+            m.transcript_word_count for m in metrics
+            if m.transcript_word_count
+        )
+        # ~130 words/min average speech rate
+        estimated_audio_hours = round((total_words / 130) / 60, 1)
+
+        processing_times = [
+            m.processing_time_seconds for m in metrics
+            if m.processing_time_seconds
+        ]
+        avg_latency = round(
+            sum(processing_times) / len(processing_times), 1
+        ) if processing_times else 0
+
+        total_all = db.query(MeetingMetrics).count()
+        success_count = db.query(MeetingMetrics).filter_by(
+            status="success"
+        ).count()
+        success_rate = round(
+            (success_count / total_all) * 100, 1
+        ) if total_all else 0
+
+        # Distribution: % of meetings that completed under 30s
+        under_30 = sum(1 for t in processing_times if t <= 30)
+        pct_under_30 = round(
+            (under_30 / len(processing_times)) * 100
+        ) if processing_times else 0
+
+        return jsonify({
+            "total_meetings": total_meetings,
+            "estimated_audio_hours": estimated_audio_hours,
+            "avg_latency_seconds": avg_latency,
+            "success_rate": success_rate,
+            "pct_under_30s": pct_under_30
+        })
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     app.run(debug=True)
