@@ -3,7 +3,7 @@ import json
 import logging
 from google import genai
 from pydantic import BaseModel, field_validator, ValidationError
-from typing import List
+from typing import List, Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,24 +14,33 @@ logger = logging.getLogger(__name__)
 class Task(BaseModel):
     task: str
     owner: str
-    deadline: str
-    priority: str
+    deadline_raw: str
+    priority: Optional[str] = None
     dependencies: str
 
     @field_validator("priority")
     @classmethod
     def validate_priority(cls, v):
+        if v is None:
+            return None
         allowed = {"High", "Medium", "Low"}
         normalized = v.strip().capitalize()
         if normalized not in allowed:
-            raise ValueError(f"priority must be one of {allowed}, got '{v}'")
+            return None  # don't crash, just drop it
         return normalized
 
-    @field_validator("task", "owner", "deadline", "dependencies")
+    @field_validator("task", "owner", "dependencies")
     @classmethod
     def must_be_non_empty_string(cls, v):
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Field must be a non-empty string")
+        return v.strip()
+
+    @field_validator("deadline_raw")
+    @classmethod
+    def clean_deadline(cls, v):
+        if not isinstance(v, str) or not v.strip():
+            return "Not specified"
         return v.strip()
 
 
@@ -60,18 +69,21 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no extra
   "tasks": [
     {{
       "task": "Description of the task",
-      "owner": "Person responsible, or 'Unassigned' if not mentioned",
-      "deadline": "Deadline if mentioned, or 'Not specified'",
-      "priority": "High or Medium or Low — infer from context",
-      "dependencies": "Any task or condition this depends on, or 'None'"
+      "owner": "Person responsible, or 'Unassigned' if not explicitly named",
+      "deadline_raw": "Deadline exactly as spoken in the transcript (e.g. 'by Wednesday night'), or 'Not specified'",
+      "priority": "High or Medium or Low — ONLY if the transcript explicitly states urgency or importance. If not mentioned, return null.",
+      "dependencies": "Any task or condition this depends on, or 'None'",
     }}
   ]
 }}
 
-Rules:
-- summary must be detailed and cover all discussed topics
-- tasks must be a list; if no tasks exist, return an empty list []
-- priority must be exactly one of: High, Medium, Low
+Strict rules:
+- Extract ALL tasks mentioned, including those listed in any recap or summary section of the transcript
+- Do NOT infer or hallucinate priority — only set it if the speaker explicitly signals it
+- deadline_raw must be the exact phrase from the transcript, not a reformatted date
+- owner must be a name from the transcript, or 'Unassigned' — never invent a name
+- summary must cover all topics discussed, all decisions made, and accurate durations or numbers
+- tasks must be a list; if no tasks exist, return []
 - Do NOT wrap output in markdown or code blocks
 - Return raw JSON only
 
