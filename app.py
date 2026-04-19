@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from utils.db_safe_commit import safe_commit
 from datetime import datetime, timedelta, date
 import io
+from tasks import process_meeting
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -17,8 +18,7 @@ import logging
 
 from database.connection import SessionLocal
 from database.models import Meeting, Task, MeetingMetrics
-from tasks import process_meeting
-import threading
+from celery_app import celery
 
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
@@ -35,14 +35,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-def run_process_meeting(meeting_id, file_path):
-    try:
-        process_meeting(meeting_id, file_path)
-    except Exception as e:
-        logger.error(
-            f"Processing failed for meeting {meeting_id}: {e}",
-            exc_info=True
-        )
 
 upload_folder = 'uploads'
 os.makedirs(upload_folder, exist_ok=True)
@@ -55,11 +47,12 @@ def get_session_id():
 
 
 def scheduled_stale_check():
+    return
     with app.app_context():
         mark_stale_meetings()
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(
+"""scheduler.add_job(
     func=scheduled_stale_check,
     trigger="interval",
     minutes=10,
@@ -67,7 +60,7 @@ scheduler.add_job(
     replace_existing=True,
     next_run_time=datetime.now() + timedelta(seconds=30)
 )
-scheduler.start()
+scheduler.start()"""
 
 # Run once immediately on startup too
 ##threading.Thread(target=scheduled_stale_check, daemon=True).start()
@@ -259,16 +252,13 @@ def home():
             db.close()
 
         try:
-            thread = threading.Thread(
-                target=run_process_meeting,
-                args=(meeting_id, file_path)
-            )
-            thread.daemon = True
-            thread.start()
-            logger.info(f"Meeting {meeting_id} thread started successfully")
+            process_meeting.delay(meeting_id, file_path)
+            logger.info(f"Dispatching meeting {meeting_id} to Celery")
+            celery.send_task("tasks.process_meeting", args=[meeting_id, file_path])
             session['last_meeting_id'] = meeting_id
+
         except Exception as e:
-            logger.error(f"Failed to start thread for meeting {meeting_id}: {e}")
+            logger.error(f"Celery dispatch failed: {e}", exc_info=True)
             db = SessionLocal()
             try:
                 if isinstance(meeting_id, int):
