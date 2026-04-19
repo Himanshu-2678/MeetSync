@@ -32,7 +32,7 @@ MeetSync automates this process and turns raw meeting audio into actionable meet
 
 1. The user uploads a meeting audio file
 2. Flask saves the file and immediately inserts a meeting record with status `processing`
-3. A background worker thread is started to process the meeting asynchronously. The worker is wrapped with crash protection so failures are logged instead of silently terminating the job.
+3. The meeting is dispatched to a background worker (Celery in local testing, threading in deployed version) for asynchronous processing. The worker is wrapped with crash protection so failures are logged instead of silently terminating the job.
 4. The user is redirected to a polling page that checks status every 3 seconds
 5. The worker transcribes the audio using Deepgram, then calls Gemini to extract structured minutes
 6. Gemini response is validated against a strict Pydantic schema before being accepted
@@ -44,7 +44,8 @@ MeetSync automates this process and turns raw meeting audio into actionable meet
 ## Tech Stack
 
 - Backend: Python, Flask
-- Async Processing: Python threading
+- Async Processing: Celery with Redis (local testing), Python threading (deployed version)
+- Load Testing: Locust
 - Speech-to-Text: Deepgram API
 - LLM: Google Gemini 2.5 Flash
 - Schema Validation: Pydantic
@@ -175,9 +176,39 @@ Because retries are rare and observable, retry-related cost inflation is minimal
 
 These are intentional tradeoffs rather than bugs.
 
-The system does not handle speaker diarization so it cannot attribute statements to specific speakers when they are not introduced by name in the audio. Task ownership extraction depends entirely on whether the transcript contains explicit ownership language. If a meeting discusses work without assigning it to named people, all tasks will show Unassigned. Additionally, `deadline_parsed` relies on dateparser resolving relative dates against the system clock at processing time, which means a deadline like "next Friday" will resolve differently depending on when the job runs.
+The system does not handle speaker diarization so it cannot attribute statements to specific speakers when they are not introduced by name in the audio. Task ownership extraction depends entirely on whether the transcript contains explicit ownership language. If a meeting discusses work without assigning it to named people, all tasks will show Unassigned. Additionally, `deadline_parsed` relies on dateparser resolving relative dates against the system clock at processing time, which means a deadline like "next Friday" will resolve differently depending on when the job runs. 
+Under high load, the system is constrained by single-worker processing and external API rate limits. Queue latency can grow significantly when the ingestion rate exceeds processing capacity.
 
----
+## Load Testing & System Behavior
+
+The system was stress tested using Locust to simulate concurrent meeting uploads.
+
+### Setup
+
+- 10 and 25 concurrent users
+- Audio length: ~1 minute
+- Celery worker with single concurrency (`--pool=solo`)
+
+### Observations
+
+At 10 users:
+- Queue delay increased from ~1.5 seconds (baseline) to ~90–130 seconds
+- Processing time remained stable (~18–22 seconds)
+- No failures observed
+
+At 25 users:
+- Queue delay increased significantly (~450–480 seconds)
+- Processing time remained stable (~18–22 seconds)
+- Failures observed due to external API rate limits (Gemini quota exhaustion)
+
+### Key Insights
+
+- The system is bottlenecked by worker concurrency, not processing speed
+- Queue latency grows linearly under load when using a single worker
+- External API limits introduce a second failure mode independent of system performance
+- Processing remains stable even under heavy queue pressure, indicating a decoupled architecture
+
+These tests demonstrate that the system behaves predictably under load and that scaling worker concurrency would directly reduce queue latency.
 
 ## Design Decisions and Tradeoffs
 
@@ -264,6 +295,8 @@ SELECT meeting_id, gemini_retry_count FROM meeting_metrics WHERE gemini_retry_co
 -- Failure rate
 SELECT status, COUNT(*) FROM meeting_metrics GROUP BY status;
 ```
+
+- `queue_delay_seconds`: time between meeting creation and worker pickup (used to measure queue latency under load)
 
 ---
 
