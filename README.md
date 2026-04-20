@@ -26,20 +26,20 @@ MeetSync automates this process and turns raw meeting audio into actionable meet
 - Clean, minimal UI optimized for readability
 - Persistent storage of all meetings, transcripts, and tasks in PostgreSQL
 
----
+
 
 ## How It Works
 
 1. The user uploads a meeting audio file
 2. Flask saves the file and immediately inserts a meeting record with status `processing`
-3. The meeting is dispatched to a background worker (Celery in local testing, threading in deployed version) for asynchronous processing. The worker is wrapped with crash protection so failures are logged instead of silently terminating the job.
+3. The meeting is dispatched to a background worker (Celery (used for system evaluation and load testing), threading (used in deployed demo due to platform constraints)) for asynchronous processing. The worker is wrapped with crash protection so failures are logged instead of silently terminating the job.
 4. The user is redirected to a polling page that checks status every 3 seconds
 5. The worker transcribes the audio using Deepgram, then calls Gemini to extract structured minutes
 6. Gemini response is validated against a strict Pydantic schema before being accepted
 7. On success, the meeting and tasks are saved to PostgreSQL in a single transaction
 8. The polling page detects the success and redirects to the result page automatically
 
----
+
 
 ## Tech Stack
 
@@ -54,7 +54,7 @@ MeetSync automates this process and turns raw meeting audio into actionable meet
 - Scheduling: APScheduler
 - Deployment: Render
 
----
+
 
 ## Project Structure
 ```
@@ -88,7 +88,7 @@ MeetSync/
 `-- README.md
 ```
 
----
+
 
 ## Demo
 
@@ -161,7 +161,9 @@ This transition enabled controlled load testing and clear identification of syst
 
 ## System Evaluation
 
-The system was evaluated across reliability, correctness, and cost. Latency, retries, and failure modes are measured per meeting via structured metrics stored in the `meeting_metrics` table. Output quality was evaluated qualitatively against real meeting transcripts. Cost per meeting was estimated using real API pricing and observed token usage.
+The system was evaluated across reliability, correctness, and cost. Latency, retries, and failure modes are measured per meeting via structured metrics stored in the `meeting_metrics` table. Output quality was evaluated qualitatively against real meeting transcripts. Cost per meeting was estimated using real API pricing and observed token usage. 
+
+Failures observed during testing were primarily due to external API rate limits (HTTP 429), while the internal pipeline remained stable under normal conditions.
 
 ### Reliability
 
@@ -189,7 +191,7 @@ Deadline extraction from natural language worked well for specific phrases like 
 
 ### Performance
 
-Processing time scales roughly with audio length. A one-minute audio file completed in around 7-15 seconds end to end. A 10-15 minute meeting may take 30-35 seconds. The bottleneck is Deepgram transcription, not Gemini summarization. Because processing is async, this has no impact on the user-facing response time. The upload returns instantly regardless of audio length.
+Processing time scales roughly with audio length. A one-minute audio file completed in around 7-15 seconds end to end. A 10-15 minute meeting may take 30-35 seconds. The bottleneck is Deepgram transcription, not Gemini summarization. This reinforces that improvements in concurrency primarily reduce queue delay, not processing time.
 
 ### Cost
 
@@ -202,7 +204,10 @@ Because retries are rare and observable, retry-related cost inflation is minimal
 These are intentional tradeoffs rather than bugs.
 
 The system does not handle speaker diarization so it cannot attribute statements to specific speakers when they are not introduced by name in the audio. Task ownership extraction depends entirely on whether the transcript contains explicit ownership language. If a meeting discusses work without assigning it to named people, all tasks will show Unassigned. Additionally, `deadline_parsed` relies on dateparser resolving relative dates against the system clock at processing time, which means a deadline like "next Friday" will resolve differently depending on when the job runs. 
-Under high load, the system is constrained by single-worker processing and external API rate limits. Queue latency can grow significantly when the ingestion rate exceeds processing capacity.
+Under high load, the system is constrained by single-worker processing and external API rate limits. Queue latency can grow significantly when the ingestion rate exceeds processing capacity.  
+
+- noisy audio affects transcription quality
+- overlapping speakers reduce task attribution accuracy
 
 ## Load Testing & System Behavior
 
@@ -332,6 +337,8 @@ Every processed meeting records the following metrics to the `meeting_metrics` t
 - `status`: success or failed
 - `failure_reason`: exact reason if the job failed
 
+These metrics were used directly to analyze system behavior under controlled load experiments.
+
 These can be queried directly:
 ```sql
 -- Average processing time for successful meetings
@@ -370,3 +377,6 @@ Render free tier does not support background worker services. The Celery-based a
 Because Neon suspends compute when idle on the free tier, database connections can occasionally become stale. The application configures SQLAlchemy connection pooling with health checks to automatically detect and refresh dropped connections. This prevents errors such as `SSL connection has been closed unexpectedly` during long-running processing jobs.
 
 The database schema is created automatically on startup via `init_db()`. Redeployment to a new database requires only updating the `DATABASE_URL` environment variable.
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
