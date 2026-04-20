@@ -5,14 +5,15 @@ from database.models import MeetingMetrics
 
 logger = logging.getLogger(__name__)
 
-
 def save_metrics(
     meeting_id: int,
     status: str,
     processing_time_seconds: float = None,
     transcript_word_count: int = None,
     gemini_retry_count: int = 0,
-    failure_reason: str = None):
+    failure_reason: str = None,
+    queue_delay_seconds=None,
+):
 
     log_data = {
         "event": "meeting_processed",
@@ -21,17 +22,17 @@ def save_metrics(
         "processing_time_seconds": round(processing_time_seconds, 2) if processing_time_seconds else None,
         "transcript_word_count": transcript_word_count,
         "gemini_retry_count": gemini_retry_count,
-        "failure_reason": failure_reason}
+        "failure_reason": failure_reason,
+        "queue_delay_seconds": round(queue_delay_seconds, 2) if queue_delay_seconds else None
+    }
 
     if status == "success":
         logger.info(json.dumps(log_data))
     else:
         logger.error(json.dumps(log_data))
 
-    # Saving to DB
     db = SessionLocal()
     try:
-        # Avoiding duplicate metrics for the same meeting
         existing = db.query(MeetingMetrics).filter_by(meeting_id=meeting_id).first()
         if existing:
             logger.warning(f"Metrics for meeting {meeting_id} already exist — skipping")
@@ -43,8 +44,10 @@ def save_metrics(
             transcript_word_count=transcript_word_count,
             gemini_retry_count=gemini_retry_count,
             status=status,
-            failure_reason=failure_reason)
-        
+            failure_reason=failure_reason,
+            queue_delay_seconds=round(queue_delay_seconds, 2) if queue_delay_seconds else None  # ✅ FIXED
+        )
+
         db.add(metrics)
         db.commit()
         logger.info(f"Metrics saved for meeting {meeting_id}")
