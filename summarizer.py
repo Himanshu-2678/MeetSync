@@ -105,6 +105,8 @@ def summarize_text(text: str) -> dict:
     prompt = PROMPT_TEMPLATE.format(transcript=text)
     last_error = None
     attempt = 0
+    json_failures = 0
+    validation_failures = 0
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         logger.info(f"Attempt {attempt}/{MAX_ATTEMPTS} — Calling Gemini API")
@@ -128,6 +130,7 @@ def summarize_text(text: str) -> dict:
             try:
                 parsed = json.loads(raw)
             except json.JSONDecodeError as e:
+                json_failures += 1
                 last_error = f"JSONDecodeError: {str(e)}"
                 logger.error(json.dumps({
                     "attempt": attempt,
@@ -140,6 +143,7 @@ def summarize_text(text: str) -> dict:
             try:
                 validated = MeetingOutput(**parsed)
             except ValidationError as e:
+                validation_failures += 1
                 errors = e.errors()
                 last_error = f"Schema validation failed: {errors}"
                 logger.error(json.dumps({
@@ -159,7 +163,10 @@ def summarize_text(text: str) -> dict:
                 "status": "success",
                 "summary": validated.summary,
                 "tasks": [t.model_dump() for t in validated.tasks],
-                "retry_count": attempt - 1}
+                "retry_count": attempt - 1,
+                "json_failures": json_failures,
+                "validation_failures": validation_failures
+            }
 
         except Exception as e:
             last_error = f"Unexpected error: {str(e)}"
@@ -176,7 +183,10 @@ def summarize_text(text: str) -> dict:
 
     return {
         "status": "failed",
-        "error": f"Schema validation failed after {MAX_ATTEMPTS} attempts. Last error: {last_error}",
+        "error": f"...",
         "summary": None,
         "tasks": [],
-        "retry_count": attempt - 1}
+        "retry_count": attempt - 1,
+        "json_failures": json_failures,
+        "validation_failures": validation_failures
+    }
