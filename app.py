@@ -254,7 +254,7 @@ def home():
         try:
             process_meeting.delay(meeting_id, file_path)
             logger.info(f"Dispatching meeting {meeting_id} to Celery")
-            celery.send_task("tasks.process_meeting", args=[meeting_id, file_path])
+            #celery.send_task("tasks.process_meeting", args=[meeting_id, file_path])
             session['last_meeting_id'] = meeting_id
 
         except Exception as e:
