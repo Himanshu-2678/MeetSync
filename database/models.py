@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Date, TIMESTAMP, ForeignKey, func, Index, Float
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, TIMESTAMP, ForeignKey, func, Index, Float
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -12,7 +12,7 @@ class Meeting(Base):
     transcript        = Column(Text, nullable=True)
     summary           = Column(Text, nullable=True)
     processing_status = Column(String(20), nullable=False, default="open")
-    created_at        = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     session_id        = Column(String(36), nullable=True, index=True)  
 
     tasks = relationship("Task", back_populates="meeting", cascade="all, delete-orphan")
@@ -32,7 +32,7 @@ class Task(Base):
     deadline_parsed = Column(Date, nullable=True)
     priority = Column(String(10), nullable=True)
     status          = Column(String(20), nullable=False, default="pending")
-    created_at      = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     meeting = relationship("Meeting", back_populates="tasks")
 
@@ -51,6 +51,7 @@ class MeetingMetrics(Base):
     gemini_retry_count       = Column(Integer, nullable=False, default=0)
     status                   = Column(String(20), nullable=False)
     failure_reason           = Column(Text, nullable=True)
-    created_at               = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    queue_delay_seconds = Column(Float, nullable=True)
 
     meeting = relationship("Meeting", back_populates="metrics")
