@@ -13,6 +13,8 @@ def save_metrics(
     gemini_retry_count: int = 0,
     failure_reason: str = None,
     queue_delay_seconds=None,
+    experiment_tag=None,
+    worker_count=None,
 ):
 
     log_data = {
@@ -23,7 +25,9 @@ def save_metrics(
         "transcript_word_count": transcript_word_count,
         "gemini_retry_count": gemini_retry_count,
         "failure_reason": failure_reason,
-        "queue_delay_seconds": round(queue_delay_seconds, 2) if queue_delay_seconds else None
+        "queue_delay_seconds": round(queue_delay_seconds, 2) if queue_delay_seconds else None,
+        "experiment_tag": experiment_tag,
+        "worker_count": worker_count,
     }
 
     if status == "success":
@@ -35,8 +39,8 @@ def save_metrics(
     try:
         existing = db.query(MeetingMetrics).filter_by(meeting_id=meeting_id).first()
         if existing:
-            logger.warning(f"Metrics for meeting {meeting_id} already exist — skipping")
-            return
+            db.delete(existing)
+            db.commit()
 
         metrics = MeetingMetrics(
             meeting_id=meeting_id,
@@ -45,7 +49,9 @@ def save_metrics(
             gemini_retry_count=gemini_retry_count,
             status=status,
             failure_reason=failure_reason,
-            queue_delay_seconds=round(queue_delay_seconds, 2) if queue_delay_seconds else None  # ✅ FIXED
+            queue_delay_seconds=round(queue_delay_seconds, 2) if queue_delay_seconds else None,
+            experiment_tag=experiment_tag,
+            worker_count=worker_count
         )
 
         db.add(metrics)
