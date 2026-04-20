@@ -11,3 +11,4 @@ dateparser
 apscheduler
 deepgram-sdk
 psycopg2-binary
+locust
