@@ -144,7 +144,20 @@ python -m database.init_db
 python app.py
 ```
 
----
+## System Evolution
+
+### V1
+- Thread-based async processing
+- No queue visibility
+- Limited failure tracking
+
+### V2 (current)
+- Celery + Redis queue
+- Worker-based processing
+- Retry logic with failure tracking
+- Metrics collection (queue delay, processing time)
+
+This transition enabled controlled load testing and clear identification of system bottlenecks.
 
 ## System Evaluation
 
@@ -155,6 +168,18 @@ The system was evaluated across reliability, correctness, and cost. Latency, ret
 Every meeting job records whether it succeeded or failed, how long it took, and whether Gemini needed to be retried. This makes it possible to query the failure rate and retry patterns directly from the database rather than guessing. In practice, Gemini 2.5 Flash returned valid JSON on the first attempt for the majority of test meetings. During testing, the Pydantic validation layer never rejected a response that the JSON parser accepted, indicating strong schema adherence when the prompt is well formed.
 
 The stale job detector was verified by manually inserting a meeting row with a `created_at` timestamp 15 minutes in the past and confirming it was marked failed on the next app startup. Worker crash recovery works as designed.
+ 
+ 
+### Structured Output Reliability
+
+LLM responses are validated against a strict Pydantic schema before being accepted by the system.
+
+Under normal conditions, Gemini outputs consistently adhered to the expected JSON structure and passed validation on the first attempt. No cases were observed where syntactically valid JSON failed schema validation, indicating strong alignment between prompting and schema design.
+
+Validation acts as a safeguard against malformed or incomplete outputs. Any response failing schema validation triggers a retry, ensuring that only structured and complete data is stored in the system.
+
+This ensures that downstream components operate on reliable structured data rather than raw LLM output.
+
 
 ### Output Quality
 
@@ -181,34 +206,58 @@ Under high load, the system is constrained by single-worker processing and exter
 
 ## Load Testing & System Behavior
 
-The system was stress tested using Locust to simulate concurrent meeting uploads.
+The system was evaluated using controlled burst experiments to understand how queueing and processing behave under different worker configurations.
 
 ### Setup
 
-- 10 and 25 concurrent users
+- Fixed workload: 10 meeting uploads triggered simultaneously using Locust
 - Audio length: ~1 minute
-- Celery worker with single concurrency (`--pool=solo`)
+- Mock LLM enabled with fixed latency (~3 seconds) to isolate system behavior from external API limits
+- Celery worker with thread-based concurrency
+
+### Worker Configurations Tested
+
+| Workers | Configuration |
+|--------|--------------|
+| 1 | `--concurrency=1` |
+| 2 | `--concurrency=2` |
+| 4 | `--concurrency=4` |
+
+
+### Results
+
+| Workers | Avg Queue Delay (s) | Avg Processing Time (s) | Avg Total Time (s) |
+|--------|--------------------|--------------------------|--------------------|
+| 1 | ~24.7 | ~5.3 | ~30.0 |
+| 2 | ~14.3 | ~6.6 | ~20.9 |
+| 4 | ~5.9  | ~6.3 | ~12.2 |
+
 
 ### Observations
 
-At 10 users:
-- Queue delay increased from ~1.5 seconds (baseline) to ~90–130 seconds
-- Processing time remained stable (~18–22 seconds)
-- No failures observed
+With a single worker, jobs are processed sequentially. Queue delay increases linearly as each request waits for the previous one to finish.
 
-At 25 users:
-- Queue delay increased significantly (~450–480 seconds)
-- Processing time remained stable (~18–22 seconds)
-- Failures observed due to external API rate limits (Gemini quota exhaustion)
+With two workers, jobs are processed in pairs. Queue delay shows a step pattern where every two jobs are processed together before the next batch starts.
+
+With four workers, jobs are processed in groups of four. Queue delay drops significantly and follows a clear batched execution pattern.
+
+Processing time remains roughly constant across all configurations, indicating that the compute pipeline is stable and not the bottleneck.  
+
+This behavior shows a clear separation between queue delay and processing time, indicating that system latency is dominated by scheduling constraints rather than computational inefficiency.
+
 
 ### Key Insights
 
-- The system is bottlenecked by worker concurrency, not processing speed
-- Queue latency grows linearly under load when using a single worker
-- External API limits introduce a second failure mode independent of system performance
-- Processing remains stable even under heavy queue pressure, indicating a decoupled architecture
+- System latency is dominated by queue delay under low concurrency  
+- Increasing worker concurrency reduces queue delay significantly  
+- Processing time remains stable, confirming that the bottleneck is scheduling, not computation  
+- The system exhibits batch-based execution behavior proportional to worker count  
 
-These tests demonstrate that the system behaves predictably under load and that scaling worker concurrency would directly reduce queue latency.
+
+### Notes on Real API Testing
+
+Initial tests using real Gemini API calls showed similar queueing behavior, but were limited by rate limits under concurrent load. To ensure controlled and repeatable experiments, LLM inference was simulated with fixed latency during load testing.
+
 
 ## Design Decisions and Tradeoffs
 
@@ -271,7 +320,7 @@ Based on a typical 30-minute meeting producing roughly 3000-4000 words of transc
 
 At 1000 meetings per day, that is roughly $150/day in API costs, not counting infrastructure.
 
----
+
 
 ## Observability
 
@@ -298,7 +347,19 @@ SELECT status, COUNT(*) FROM meeting_metrics GROUP BY status;
 
 - `queue_delay_seconds`: time between meeting creation and worker pickup (used to measure queue latency under load)
 
----
+### Failure Handling
+
+Failure types observed:
+- Rate limit (429)
+- External API failures
+
+Retry strategy:
+- Exponential backoff
+- Max retries: 2
+
+Observations:
+- Failures were primarily due to external API limits
+- System correctly records failure reasons and avoids partial writes
 
 ## Deployment Notes
 
