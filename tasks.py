@@ -11,12 +11,15 @@ from dotenv import load_dotenv
 load_dotenv()
 from datetime import datetime
 from celery_app import celery
+import os
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
+USE_MOCK_LLM = True
+logger.info(f"[CONFIG] USE_MOCK_LLM={USE_MOCK_LLM}")
 
 def parse_deadline(raw: str):
     if not raw or raw.strip().lower() in ("not specified", "none", ""):
@@ -31,9 +34,15 @@ def parse_deadline(raw: str):
 
 @celery.task(bind=True)
 def process_meeting(self, meeting_id: int, file_path: str):
-
+    logger.info(f"[WORKER PID] {os.getpid()} processing meeting {meeting_id}")
     db = SessionLocal()
-    start_exec = time.time()
+    task_started_at = time.time()
+
+    experiment_tag = os.getenv("EXPERIMENT_TAG", "unknown")
+    try:
+        worker_count = int(os.getenv("WORKER_COUNT", 1))
+    except:
+        worker_count = 1
 
     try:
         meeting = db.query(Meeting).filter_by(id=meeting_id).first()
@@ -51,8 +60,6 @@ def process_meeting(self, meeting_id: int, file_path: str):
         logger.info(
             f"Worker picked up meeting {meeting_id} | queue_delay={round(queue_delay,2) if queue_delay else 'NA'}s"
         )
-
-        start_time = time.time()
 
         # Idempotency guard
         if meeting.processing_status == "success":
@@ -80,14 +87,44 @@ def process_meeting(self, meeting_id: int, file_path: str):
             save_metrics(
                 meeting_id=meeting_id,
                 status="failed",
-                processing_time_seconds=time.time() - start_time,
+                processing_time_seconds=time.time() - task_started_at,
                 failure_reason=f"Transcription failed: {str(e)}",
-                queue_delay_seconds=queue_delay  # ✅ FIX 2
+                queue_delay_seconds=queue_delay,
+                experiment_tag=experiment_tag,
+                worker_count=worker_count,
             )
             return
 
         # Step 2: Summarizing
-        result = summarize_text(transcript)
+        if USE_MOCK_LLM:
+            logger.info(f"[MOCK MODE] Simulating LLM for meeting {meeting_id}")
+
+            # simulate realistic latency (important for experiment)
+            time.sleep(3)
+
+            result = {
+                "status": "success",
+                "summary": "This is a mock summary of the meeting discussion.",
+                "tasks": [
+                    {
+                        "task": "Complete project milestone",
+                        "owner": "Alex",
+                        "deadline_raw": "Tomorrow",
+                        "priority": "high"
+                    },
+                    {
+                        "task": "Prepare test report",
+                        "owner": "Jordan",
+                        "deadline_raw": "Friday",
+                        "priority": "medium"
+                    }
+                ],
+                "retry_count": 0
+            }
+
+        else:
+            result = summarize_text(transcript)
+
         retry_count = result.get("retry_count", 0)
 
         if result["status"] != "success":
@@ -98,11 +135,13 @@ def process_meeting(self, meeting_id: int, file_path: str):
             save_metrics(
                 meeting_id=meeting_id,
                 status="failed",
-                processing_time_seconds=time.time() - start_time,
+                processing_time_seconds=time.time() - task_started_at,
                 transcript_word_count=transcript_word_count,
                 gemini_retry_count=retry_count,
                 failure_reason=f"Summarization failed: {result['error']}",
-                queue_delay_seconds=queue_delay  # ✅ FIX 3
+                queue_delay_seconds=queue_delay,  
+                experiment_tag=experiment_tag,
+                worker_count=worker_count,
             )
             return
 
@@ -138,12 +177,12 @@ def process_meeting(self, meeting_id: int, file_path: str):
                     deadline_raw=deadline_raw,
                     deadline_parsed=parsed_date,
                     priority=t.get("priority") or None,
-                    status="open"
+                    status="open",
                 )
                 db.add(task)
 
             db.commit()
-            processing_time = time.time() - start_time
+            processing_time = time.time() - task_started_at
 
             logger.info(
                 f"Meeting {meeting_id} completed in {round(processing_time, 2)}s, "
@@ -156,7 +195,9 @@ def process_meeting(self, meeting_id: int, file_path: str):
                 processing_time_seconds=processing_time,
                 transcript_word_count=transcript_word_count,
                 gemini_retry_count=retry_count,
-                queue_delay_seconds=queue_delay  # ✅ FIX 4 (MOST IMPORTANT)
+                queue_delay_seconds=queue_delay, 
+                experiment_tag=experiment_tag,
+                worker_count=worker_count,
             )
 
         except Exception as e:
@@ -173,11 +214,13 @@ def process_meeting(self, meeting_id: int, file_path: str):
             save_metrics(
                 meeting_id=meeting_id,
                 status="failed",
-                processing_time_seconds=time.time() - start_time,
+                processing_time_seconds=time.time() - task_started_at,
                 transcript_word_count=transcript_word_count,
                 gemini_retry_count=retry_count,
                 failure_reason=f"DB transaction failed: {str(e)}",
-                queue_delay_seconds=queue_delay  # ✅ FIX 5
+                queue_delay_seconds=queue_delay,  
+                experiment_tag=experiment_tag,
+                worker_count=worker_count,
             )
 
     except Exception as e:
@@ -195,9 +238,11 @@ def process_meeting(self, meeting_id: int, file_path: str):
         save_metrics(
             meeting_id=meeting_id,
             status="failed",
-            processing_time_seconds=time.time() - start_time,
+            processing_time_seconds=time.time() - task_started_at,
             failure_reason=f"Unhandled error: {str(e)}",
-            queue_delay_seconds=queue_delay  # ✅ FIX 6
+            queue_delay_seconds=queue_delay, 
+            experiment_tag=experiment_tag,
+            worker_count=worker_count,
         )
 
     finally:
