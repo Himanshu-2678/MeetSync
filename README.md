@@ -4,7 +4,7 @@ MeetSync is an AI-powered meeting minutes generator built to help users quickly 
 
 ## Architecture Diagram
 
-![MeetSync Architecture](assets/architecure_diagram_meetsync.png)
+![MeetSync Architecture](assets/meetsync_architecture.svg)
 
 ## Why I built this
 
@@ -169,7 +169,7 @@ Every meeting job records whether it succeeded or failed, how long it took, and 
 
 The stale job detector was verified by manually inserting a meeting row with a `created_at` timestamp 15 minutes in the past and confirming it was marked failed on the next app startup. Worker crash recovery works as designed.
  
- 
+
 ### Structured Output Reliability
 
 LLM responses are validated against a strict Pydantic schema before being accepted by the system.
