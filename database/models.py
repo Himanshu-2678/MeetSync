@@ -53,5 +53,7 @@ class MeetingMetrics(Base):
     failure_reason           = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     queue_delay_seconds = Column(Float, nullable=True)
+    experiment_tag = Column(String(50), nullable=True, index=True)
+    worker_count = Column(Integer, nullable=True)
 
     meeting = relationship("Meeting", back_populates="metrics")
