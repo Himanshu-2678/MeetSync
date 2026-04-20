@@ -18,7 +18,7 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
-USE_MOCK_LLM = True
+USE_MOCK_LLM = False
 logger.info(f"[CONFIG] USE_MOCK_LLM={USE_MOCK_LLM}")
 
 def parse_deadline(raw: str):
