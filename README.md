@@ -1,10 +1,15 @@
 # MeetSync: AI Meeting Minutes Generator
 
-MeetSync is an AI-powered meeting minutes generator built to help users quickly extract key insights from meeting audio. The idea was simple: instead of listening to long recordings or writing notes manually, users should be able to upload meeting audio and instantly get clear, structured minutes with decisions and action items.
+MeetSync is an asynchronous LLM pipeline that converts meeting audio into structured summaries, decisions, and action items. It is designed as a fault-tolerant system with queue-based processing, retry handling, and structured validation, focusing on reliable integration of AI models into production-style workflows.
 
 ## Architecture Diagram
 
-![MeetSync Architecture](assets/meetsync_architecture.svg)
+The system processes uploads through a multi-stage async pipeline, separating request handling from background processing and integrating external AI services for transcription and structured extraction.  
+
+![MeetSync Architecture](assets/meetsync_architecture.png)
+
+> Note: The system design uses a queue-based worker architecture (Celery + Redis). The live deployment uses a thread-based variant due to platform constraints.
+> 
 
 ## Why I built this
 
